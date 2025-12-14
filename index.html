@@ -39,13 +39,58 @@
         .row-metrics { height: 22%; } .row-details { height: 23%; } .row-footer { height: 15%; }
         .loader { border: 4px solid #f3f3f3; border-top: 4px solid #3498db; border-radius: 50%; width: 30px; height: 30px; animation: spin 1s linear infinite; }
         @keyframes spin { 0% { transform: rotate(0deg); } 100% { transform: rotate(360deg); } }
+        
+        /* === REGLAS DE IMPRESIÓN MEJORADAS PARA SALTO DE PÁGINA INDIVIDUAL === */
         @media print {
+            /* 1. Definir el tamaño exacto de la etiqueta (6x4 pulgadas) y quitar márgenes */
             @page { size: 6in 4in; margin: 0mm; }
-            html, body { height: auto !important; overflow: visible !important; background: white !important; margin: 0 !important; padding: 0 !important; }
+
+            /* 2. Asegurar que el cuerpo y html no tengan márgenes ni scrolls */
+            html, body { 
+                height: auto !important; 
+                overflow: visible !important; 
+                background: white !important; 
+                margin: 0 !important; 
+                padding: 0 !important; 
+            }
+
+            /* 3. Ocultar los elementos de la interfaz */
             .no-print { display: none !important; }
-            .print-container { display: block !important; width: 100% !important; height: auto !important; margin: 0 !important; padding: 0 !important; position: static !important; }
-            .label-wrapper { display: block !important; width: 6in !important; height: 4in !important; margin: 0 !important; padding: 0 !important; border: none !important; box-shadow: none !important; border-radius: 0 !important; break-after: page; page-break-after: always; page-break-inside: avoid; }
-            .label-preview-container { border: 2px solid #000 !important; width: 6in !important; height: 4in !important; }
+
+            /* 4. Contenedor de impresión */
+            .print-container { 
+                display: block !important; 
+                width: 100% !important; 
+                height: auto !important; 
+                margin: 0 !important; 
+                padding: 0 !important; 
+                position: static !important; 
+            }
+            
+            /* 5. EL REGLA CRÍTICA: Contenedor de la Etiqueta */
+            .label-wrapper { 
+                /* Garantizar tamaño y quitar estilos de pantalla */
+                display: block !important; 
+                width: 6in !important; 
+                height: 4in !important; 
+                margin: 0 !important; 
+                padding: 0 !important; 
+                border: none !important; 
+                box-shadow: none !important; 
+                border-radius: 0 !important; 
+                
+                /* FUERZA EL SALTO DE PÁGINA DESPUÉS DE CADA ETIQUETA */
+                break-after: page; 
+                page-break-after: always; 
+                page-break-inside: avoid; 
+            }
+            
+            /* 6. La etiqueta en sí misma, asegurando el tamaño final */
+            .label-preview-container { 
+                border: 2px solid #000 !important; 
+                width: 6in !important; 
+                height: 4in !important; 
+            }
         }
     </style>
 </head>
