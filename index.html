@@ -28,10 +28,17 @@
         @media (max-width: 1024px) { body { height: auto; overflow-y: auto; overflow-x: hidden; } }
         #reader a, #reader-hidden a { display: none !important; }
         
-        /* Estilos base de la etiqueta */
-        .label-wrapper { margin-bottom: 2rem; padding: 0; background: white; page-break-inside: avoid; display: flex; justify-content: center; }
-        /* El contenedor visual tiene sombra en pantalla, pero no afectará al PDF si seleccionamos el hijo directo o ajustamos margins */
-        .label-wrapper-screen { margin-bottom: 2rem; padding: 1rem; background: white; border-radius: 0.5rem; box-shadow: 0 10px 15px -3px rgba(0, 0, 0, 0.1); }
+        /* ESTILO ORIGINAL DEL CONTENEDOR DE LA ETIQUETA EN PANTALLA */
+        .label-wrapper { margin-bottom: 2rem; padding: 1rem; background: white; border-radius: 0.5rem; box-shadow: 0 10px 15px -3px rgba(0, 0, 0, 0.1); page-break-inside: avoid; }
+        
+        /* ESTILO TEMPORAL PARA PDF: ELIMINA MARGEN Y SOMBRA */
+        .pdf-mode .label-wrapper {
+            margin-bottom: 0 !important;
+            padding: 0 !important;
+            box-shadow: none !important;
+            break-after: page; 
+            page-break-after: always;
+        }
 
         .label-preview-container { width: 6in; height: 4in; background-color: white; position: relative; box-sizing: border-box; border: 2px solid #000; display: flex; flex-direction: column; overflow: hidden; }
         .lbl-row { display: flex; border-bottom: 2px solid #000; width: 100%; }
@@ -47,16 +54,13 @@
         .loader { border: 4px solid #f3f3f3; border-top: 4px solid #3498db; border-radius: 50%; width: 30px; height: 30px; animation: spin 1s linear infinite; }
         @keyframes spin { 0% { transform: rotate(0deg); } 100% { transform: rotate(360deg); } }
         
-        /* Ajustes para cuando se genera el PDF via JS */
-        .pdf-mode .label-wrapper-screen { box-shadow: none; margin: 0; padding: 0; margin-bottom: 0; border-radius: 0; }
-        .pdf-mode .label-wrapper-screen { break-after: page; page-break-after: always; }
-
         @media print {
             @page { size: 6in 4in; margin: 0mm; }
             html, body { height: auto !important; overflow: visible !important; background: white !important; margin: 0 !important; padding: 0 !important; }
             .no-print { display: none !important; }
-            .print-container { display: block !important; width: 100% !important; height: auto !important; margin: 0 !important; padding: 0 !important; position: static !important; overflow: visible !important;}
-            .label-wrapper-screen { display: block !important; width: 6in !important; height: 4in !important; margin: 0 !important; padding: 0 !important; border: none !important; box-shadow: none !important; border-radius: 0 !important; break-after: page; page-break-after: always; page-break-inside: avoid; }
+            .print-container { display: block !important; width: 100% !important; height: auto !important; margin: 0 !important; padding: 0 !important; position: static !important; }
+            /* Se asegura que el label-wrapper se ajuste para impresión */
+            .label-wrapper { display: block !important; width: 6in !important; height: 4in !important; margin: 0 !important; padding: 0 !important; border: none !important; box-shadow: none !important; border-radius: 0 !important; break-after: page; page-break-after: always; page-break-inside: avoid; }
             .label-preview-container { border: 2px solid #000 !important; width: 6in !important; height: 4in !important; }
         }
     </style>
@@ -191,22 +195,28 @@
                 if (isVisible) {
                     setScans([]);
                     setScanStatus({ message: 'Escanee los códigos únicos de los paquetes...', type: 'info' });
+                    
                     setTimeout(() => {
                         const html5QrcodeScanner = new Html5QrcodeScanner(
                             "reader", 
                             { fps: 10, qrbox: { width: 250, height: 150 }, aspectRatio: 1.0, videoConstraints: { facingMode: "environment" } },
                             false
                         );
+
                         const onScanSuccess = (decodedText) => {
                             handleQuickScan(decodedText);
                             html5QrcodeScanner.pause(); 
                             setTimeout(() => html5QrcodeScanner.resume(), 1500); 
                         };
+
                         html5QrcodeScanner.render(onScanSuccess, (errorMessage) => {});
                         scannerRef.current = html5QrcodeScanner;
                     }, 100);
                 } else {
-                    if (scannerRef.current) { scannerRef.current.clear().catch(err => console.error(err)); scannerRef.current = null; }
+                    if (scannerRef.current) {
+                        scannerRef.current.clear().catch(err => console.error(err));
+                        scannerRef.current = null;
+                    }
                 }
                 return () => { if (scannerRef.current) scannerRef.current.clear().catch(err => {}); };
             }, [isVisible]);
@@ -214,15 +224,31 @@
             const handleQuickScan = (rawCode) => {
                 if (!rawCode) return;
                 const scannedCode = rawCode.trim();
-                if (scans.includes(scannedCode)) { setScanStatus({ message: `Código ${scannedCode} ya escaneado.`, type: 'warning' }); return; }
-                let foundPackage = null; let foundOrder = null;
+
+                if (scans.includes(scannedCode)) {
+                    setScanStatus({ message: `Código ${scannedCode} ya escaneado.`, type: 'warning' });
+                    return;
+                }
+
+                let foundPackage = null;
+                let foundOrder = null;
+
                 for (const order of allOrders) {
                     if (order.progreso) {
                         const pkg = order.progreso.find(p => p.codigoUnico === scannedCode);
-                        if (pkg) { foundPackage = pkg; foundOrder = order; break; }
+                        if (pkg) {
+                            foundPackage = pkg;
+                            foundOrder = order;
+                            break;
+                        }
                     }
                 }
-                if (!foundPackage || !foundOrder) { setScanStatus({ message: `Código ${scannedCode} NO encontrado en ninguna orden activa.`, type: 'error' }); return; }
+
+                if (!foundPackage || !foundOrder) {
+                    setScanStatus({ message: `Código ${scannedCode} NO encontrado en ninguna orden activa.`, type: 'error' });
+                    return;
+                }
+
                 setScans(prev => [...prev, scannedCode]);
                 setScanStatus({ message: `¡Encontrado! ${foundPackage.piezaNombre} (${foundPackage.paqueteNum}/${foundPackage.paquetesDePieza})`, type: 'success' });
             };
@@ -233,32 +259,60 @@
                 if (scans.length === 0 || isSaving) return;
                 setIsSaving(true);
                 setScanStatus({ message: `Guardando registros...`, type: 'info' });
+
                 const successfulScans = [];
                 const failedScans = [];
                 const tejedoraName = "Balta"; 
+
                 for (const scannedCode of scans) {
                     try {
-                        let foundPackage = null; let foundOrder = null;
+                        let foundPackage = null;
+                        let foundOrder = null;
                         for (const order of allOrders) {
                             if (order.progreso) {
                                 const pkg = order.progreso.find(p => p.codigoUnico === scannedCode);
                                 if (pkg) { foundPackage = pkg; foundOrder = order; break; }
                             }
                         }
+
                         if (!foundPackage) { failedScans.push(scannedCode); continue; }
+
                         const globalScanCheck = await db.collection('registro_produccion').where('codigo_paquete', '==', scannedCode).get();
-                        if (!globalScanCheck.empty) { failedScans.push(`${scannedCode} (Duplicado)`); continue; }
+                        if (!globalScanCheck.empty) {
+                            failedScans.push(`${scannedCode} (Duplicado)`);
+                            continue;
+                        }
+
                         await db.collection('registro_produccion').doc().set({
-                            codigo_paquete: scannedCode, orderId: String(foundOrder.id), fecha: FieldValue.serverTimestamp(),
+                            codigo_paquete: scannedCode,
+                            orderId: String(foundOrder.id), 
+                            fecha: FieldValue.serverTimestamp(),
                             fecha_legible: new Date().toLocaleDateString('es-MX', { day: '2-digit', month: '2-digit', year: 'numeric', hour: '2-digit', minute: '2-digit' }).replace(/\//g, '/'), 
-                            tejedor: tejedoraName, tipo: "produccion", modelo: foundOrder.codigo, partida: foundOrder.partida,
-                            paquete_indice: foundPackage.paqueteNum, paquete_total: foundPackage.paquetesDePieza, piezas_en_paquete: foundPackage.cantidad
+                            tejedor: tejedoraName,
+                            tipo: "produccion",
+                            modelo: foundOrder.codigo,
+                            partida: foundOrder.partida,
+                            paquete_indice: foundPackage.paqueteNum,
+                            paquete_total: foundPackage.paquetesDePieza,
+                            piezas_en_paquete: foundPackage.cantidad
                         });
+                        
                         successfulScans.push(scannedCode);
-                    } catch (error) { console.error("Error saving:", error); failedScans.push(`${scannedCode} (Error)`); }
+
+                    } catch (error) {
+                        console.error("Error saving:", error);
+                        failedScans.push(`${scannedCode} (Error)`);
+                    }
                 }
+
                 setIsSaving(false);
-                if (successfulScans.length > 0) { onScanSaved(); onClose(); alert(`Guardados: ${successfulScans.length}. Fallidos: ${failedScans.length}`); } else { setScanStatus({ message: `Error al guardar.`, type: 'error' }); }
+                if (successfulScans.length > 0) {
+                    onScanSaved(); 
+                    onClose(); 
+                    alert(`Guardados: ${successfulScans.length}. Fallidos: ${failedScans.length}`);
+                } else {
+                    setScanStatus({ message: `Error al guardar.`, type: 'error' });
+                }
             };
 
             if (!isVisible) return null;
@@ -311,8 +365,14 @@
             const { scannedPackages, pendingPackages } = useMemo(() => {
                 if (!orderId) return { scannedPackages: [], pendingPackages: [] };
                 const scannedCodes = new Set(scannedData.map(d => d.codigo_paquete));
-                const packages = packageLabels.map(label => ({ ...label, isScanned: scannedCodes.has(label.packageCode) }));
-                return { scannedPackages: packages.filter(p => p.isScanned), pendingPackages: packages.filter(p => !p.isScanned) };
+                const packages = packageLabels.map(label => ({
+                    ...label,
+                    isScanned: scannedCodes.has(label.packageCode),
+                }));
+                return {
+                    scannedPackages: packages.filter(p => p.isScanned),
+                    pendingPackages: packages.filter(p => !p.isScanned)
+                };
             }, [packageLabels, scannedData, orderId]);
 
             return (
@@ -337,7 +397,7 @@
             const [packageLabels, setPackageLabels] = useState([]); 
             const [filterText, setFilterText] = useState('');
             const [showScanner, setShowScanner] = useState(false);
-            const [isGeneratingPdf, setIsGeneratingPdf] = useState(false); // Estado para el loading
+            const [isGeneratingPdf, setIsGeneratingPdf] = useState(false); // Nuevo estado de carga para el PDF
 
             const generatePackageLabels = (order) => {
                 if (order.progreso && order.progreso.length > 0) {
@@ -399,10 +459,10 @@
                     element.classList.remove('pdf-mode');
                     setIsGeneratingPdf(false);
                 }).catch(err => {
-                    console.error(err);
+                    console.error("Error al generar PDF:", err);
                     element.classList.remove('pdf-mode');
                     setIsGeneratingPdf(false);
-                    alert("Error al generar PDF");
+                    alert("Error al generar PDF. Revise la consola.");
                 });
             };
 
@@ -438,7 +498,7 @@
                             )}
                         </div>
                         <div className="flex-grow flex flex-col items-center p-4 lg:p-10 bg-slate-200 overflow-y-auto print-container">
-                            {packageLabels.length > 0 ? ( packageLabels.map((labelData, index) => ( <div key={index} className="label-wrapper-screen"><ProductionLabel labelData={labelData} /></div> )) ) : ( <div className="text-center text-slate-400 mt-20">Selecciona una orden</div> )}
+                            {packageLabels.length > 0 ? ( packageLabels.map((labelData, index) => ( <div key={index} className="label-wrapper"><ProductionLabel labelData={labelData} /></div> )) ) : ( <div className="text-center text-slate-400 mt-20">Selecciona una orden</div> )}
                         </div>
                     </div>
 
