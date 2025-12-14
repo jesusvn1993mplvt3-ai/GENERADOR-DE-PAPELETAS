@@ -40,24 +40,13 @@
         .loader { border: 4px solid #f3f3f3; border-top: 4px solid #3498db; border-radius: 50%; width: 30px; height: 30px; animation: spin 1s linear infinite; }
         @keyframes spin { 0% { transform: rotate(0deg); } 100% { transform: rotate(360deg); } }
         
-        /* === REGLAS DE IMPRESIÓN MEJORADAS PARA SALTO DE PÁGINA INDIVIDUAL === */
+        /* === ESTILOS DE IMPRESIÓN PARA ZEBRA (1 HOJA POR PAQUETE) === */
         @media print {
-            /* 1. Definir el tamaño exacto de la etiqueta (6x4 pulgadas) y quitar márgenes */
             @page { size: 6in 4in; margin: 0mm; }
-
-            /* 2. Asegurar que el cuerpo y html no tengan márgenes ni scrolls */
-            html, body { 
-                height: auto !important; 
-                overflow: visible !important; 
-                background: white !important; 
-                margin: 0 !important; 
-                padding: 0 !important; 
-            }
-
-            /* 3. Ocultar los elementos de la interfaz */
+            html, body { height: auto !important; overflow: visible !important; background: white !important; margin: 0 !important; padding: 0 !important; }
             .no-print { display: none !important; }
-
-            /* 4. Contenedor de impresión */
+            
+            /* Contenedor principal se expande para mostrar TODAS las etiquetas */
             .print-container { 
                 display: block !important; 
                 width: 100% !important; 
@@ -65,11 +54,11 @@
                 margin: 0 !important; 
                 padding: 0 !important; 
                 position: static !important; 
+                overflow: visible !important;
             }
             
-            /* 5. EL REGLA CRÍTICA: Contenedor de la Etiqueta */
+            /* Cada etiqueta fuerza un salto de página al terminar */
             .label-wrapper { 
-                /* Garantizar tamaño y quitar estilos de pantalla */
                 display: block !important; 
                 width: 6in !important; 
                 height: 4in !important; 
@@ -79,18 +68,13 @@
                 box-shadow: none !important; 
                 border-radius: 0 !important; 
                 
-                /* FUERZA EL SALTO DE PÁGINA DESPUÉS DE CADA ETIQUETA */
+                /* ESTA LÍNEA HACE LA MAGIA: Salto de página después de cada una */
                 break-after: page; 
                 page-break-after: always; 
                 page-break-inside: avoid; 
             }
             
-            /* 6. La etiqueta en sí misma, asegurando el tamaño final */
-            .label-preview-container { 
-                border: 2px solid #000 !important; 
-                width: 6in !important; 
-                height: 4in !important; 
-            }
+            .label-preview-container { border: 2px solid #000 !important; width: 6in !important; height: 4in !important; }
         }
     </style>
 </head>
@@ -127,7 +111,6 @@
         const ProductionLabel = ({ labelData }) => {
             const svgRef = useRef(null);
             const order = labelData; 
-            // Buscar datos de la pieza específica para mostrar talla y peso correcto
             const subPiece = order.subPiecesData ? order.subPiecesData.find(sp => sp.pieza === order.piezaNombre) : (order.subPiecesData?.[0] || {});
             
             const materialNylon = order.threading ? order.threading.find(t => t.material && t.material.toUpperCase().includes('NYLON')) : null;
@@ -135,7 +118,6 @@
             const lycraText = materialLycra ? materialLycra.material.replace(/LYCRA/i, '').trim() : (order.threading && order.threading[1] ? order.threading[1].material : 'N/A');
             const nylonText = materialNylon ? materialNylon.material.replace(/NYLON/i, '').trim() : (order.threading && order.threading[0] ? order.threading[0].material : 'N/A');
             
-            // AQUI ESTA EL CAMBIO DEL CODIGO DE BARRAS
             const barcodeValue = order.packageCode; 
             const fechaEntrega = order.fechaEntrega || new Date(Date.now() + 7 * 24 * 60 * 60 * 1000).toLocaleDateString('es-MX');
 
@@ -226,66 +208,38 @@
                 if (isVisible) {
                     setScans([]);
                     setScanStatus({ message: 'Escanee los códigos únicos de los paquetes...', type: 'info' });
-                    
                     setTimeout(() => {
                         const html5QrcodeScanner = new Html5QrcodeScanner(
                             "reader", 
                             { fps: 10, qrbox: { width: 250, height: 150 }, aspectRatio: 1.0, videoConstraints: { facingMode: "environment" } },
                             false
                         );
-
                         const onScanSuccess = (decodedText) => {
                             handleQuickScan(decodedText);
                             html5QrcodeScanner.pause(); 
                             setTimeout(() => html5QrcodeScanner.resume(), 1500); 
                         };
-
                         html5QrcodeScanner.render(onScanSuccess, (errorMessage) => {});
                         scannerRef.current = html5QrcodeScanner;
                     }, 100);
                 } else {
-                    if (scannerRef.current) {
-                        scannerRef.current.clear().catch(err => console.error(err));
-                        scannerRef.current = null;
-                    }
+                    if (scannerRef.current) { scannerRef.current.clear().catch(err => console.error(err)); scannerRef.current = null; }
                 }
                 return () => { if (scannerRef.current) scannerRef.current.clear().catch(err => {}); };
             }, [isVisible]);
 
-            // --- LÓGICA DE ESCANEO MEJORADA: BUSCA EL CÓDIGO ÚNICO EN LAS ÓRDENES ---
             const handleQuickScan = (rawCode) => {
                 if (!rawCode) return;
                 const scannedCode = rawCode.trim();
-
-                if (scans.includes(scannedCode)) {
-                    setScanStatus({ message: `Código ${scannedCode} ya escaneado.`, type: 'warning' });
-                    return;
-                }
-
-                // BUSQUEDA INTELIGENTE
-                let foundPackage = null;
-                let foundOrder = null;
-
-                // Iterar sobre todas las órdenes para encontrar quién tiene ese codigoUnico
+                if (scans.includes(scannedCode)) { setScanStatus({ message: `Código ${scannedCode} ya escaneado.`, type: 'warning' }); return; }
+                let foundPackage = null; let foundOrder = null;
                 for (const order of allOrders) {
                     if (order.progreso) {
                         const pkg = order.progreso.find(p => p.codigoUnico === scannedCode);
-                        if (pkg) {
-                            foundPackage = pkg;
-                            foundOrder = order;
-                            break;
-                        }
+                        if (pkg) { foundPackage = pkg; foundOrder = order; break; }
                     }
                 }
-
-                if (!foundPackage || !foundOrder) {
-                    setScanStatus({ message: `Código ${scannedCode} NO encontrado en ninguna orden activa.`, type: 'error' });
-                    return;
-                }
-
-                // Si lo encontramos, lo agregamos a la lista, pero guardando los metadatos necesarios
-                // Usaremos un string JSON interno para guardar temporalmente o un objeto si react lo permite en estado
-                // Para la lista visual solo mostramos el código, pero internamente necesitamos más datos.
+                if (!foundPackage || !foundOrder) { setScanStatus({ message: `Código ${scannedCode} NO encontrado en ninguna orden activa.`, type: 'error' }); return; }
                 setScans(prev => [...prev, scannedCode]);
                 setScanStatus({ message: `¡Encontrado! ${foundPackage.piezaNombre} (${foundPackage.paqueteNum}/${foundPackage.paquetesDePieza})`, type: 'success' });
             };
@@ -296,62 +250,32 @@
                 if (scans.length === 0 || isSaving) return;
                 setIsSaving(true);
                 setScanStatus({ message: `Guardando registros...`, type: 'info' });
-
                 const successfulScans = [];
                 const failedScans = [];
                 const tejedoraName = "Balta"; 
-
                 for (const scannedCode of scans) {
                     try {
-                        // Re-buscar la data fresca (por seguridad)
-                        let foundPackage = null;
-                        let foundOrder = null;
+                        let foundPackage = null; let foundOrder = null;
                         for (const order of allOrders) {
                             if (order.progreso) {
                                 const pkg = order.progreso.find(p => p.codigoUnico === scannedCode);
                                 if (pkg) { foundPackage = pkg; foundOrder = order; break; }
                             }
                         }
-
                         if (!foundPackage) { failedScans.push(scannedCode); continue; }
-
-                        // Verificar duplicados globales
                         const globalScanCheck = await db.collection('registro_produccion').where('codigo_paquete', '==', scannedCode).get();
-                        if (!globalScanCheck.empty) {
-                            failedScans.push(`${scannedCode} (Duplicado)`);
-                            continue;
-                        }
-
+                        if (!globalScanCheck.empty) { failedScans.push(`${scannedCode} (Duplicado)`); continue; }
                         await db.collection('registro_produccion').doc().set({
-                            codigo_paquete: scannedCode, // Guardamos el código único
-                            orderId: String(foundOrder.id), 
-                            fecha: FieldValue.serverTimestamp(),
+                            codigo_paquete: scannedCode, orderId: String(foundOrder.id), fecha: FieldValue.serverTimestamp(),
                             fecha_legible: new Date().toLocaleDateString('es-MX', { day: '2-digit', month: '2-digit', year: 'numeric', hour: '2-digit', minute: '2-digit' }).replace(/\//g, '/'), 
-                            tejedor: tejedoraName,
-                            tipo: "produccion",
-                            modelo: foundOrder.codigo,
-                            partida: foundOrder.partida,
-                            paquete_indice: foundPackage.paqueteNum, // IMPORTANTE: Indice correcto
-                            paquete_total: foundPackage.paquetesDePieza,
-                            piezas_en_paquete: foundPackage.cantidad
+                            tejedor: tejedoraName, tipo: "produccion", modelo: foundOrder.codigo, partida: foundOrder.partida,
+                            paquete_indice: foundPackage.paqueteNum, paquete_total: foundPackage.paquetesDePieza, piezas_en_paquete: foundPackage.cantidad
                         });
-                        
                         successfulScans.push(scannedCode);
-
-                    } catch (error) {
-                        console.error("Error saving:", error);
-                        failedScans.push(`${scannedCode} (Error)`);
-                    }
+                    } catch (error) { console.error("Error saving:", error); failedScans.push(`${scannedCode} (Error)`); }
                 }
-
                 setIsSaving(false);
-                if (successfulScans.length > 0) {
-                    onScanSaved(); 
-                    onClose(); 
-                    alert(`Guardados: ${successfulScans.length}. Fallidos: ${failedScans.length}`);
-                } else {
-                    setScanStatus({ message: `Error al guardar.`, type: 'error' });
-                }
+                if (successfulScans.length > 0) { onScanSaved(); onClose(); alert(`Guardados: ${successfulScans.length}. Fallidos: ${failedScans.length}`); } else { setScanStatus({ message: `Error al guardar.`, type: 'error' }); }
             };
 
             if (!isVisible) return null;
@@ -404,14 +328,8 @@
             const { scannedPackages, pendingPackages } = useMemo(() => {
                 if (!orderId) return { scannedPackages: [], pendingPackages: [] };
                 const scannedCodes = new Set(scannedData.map(d => d.codigo_paquete));
-                const packages = packageLabels.map(label => ({
-                    ...label,
-                    isScanned: scannedCodes.has(label.packageCode),
-                }));
-                return {
-                    scannedPackages: packages.filter(p => p.isScanned),
-                    pendingPackages: packages.filter(p => !p.isScanned)
-                };
+                const packages = packageLabels.map(label => ({ ...label, isScanned: scannedCodes.has(label.packageCode) }));
+                return { scannedPackages: packages.filter(p => p.isScanned), pendingPackages: packages.filter(p => !p.isScanned) };
             }, [packageLabels, scannedData, orderId]);
 
             return (
@@ -437,17 +355,15 @@
             const [filterText, setFilterText] = useState('');
             const [showScanner, setShowScanner] = useState(false);
 
-            // --- GENERAR ETIQUETAS DESDE EL PROGRESO REAL ---
-            // Esto es crucial para que coincida con el código único generado
             const generatePackageLabels = (order) => {
                 if (order.progreso && order.progreso.length > 0) {
                     return order.progreso.map(p => ({
                         ...order,
-                        piezaNombre: p.piezaNombre, // Para buscar detalles específicos si varían
+                        piezaNombre: p.piezaNombre,
                         packageIndex: p.paqueteNum,
                         totalPackages: p.paquetesDePieza,
                         piecesInPackage: p.cantidad,
-                        packageCode: p.codigoUnico, // USA EL CÓDIGO ÚNICO REAL
+                        packageCode: p.codigoUnico,
                         displayPackageId: `${p.paqueteNum}/${p.paquetesDePieza}`
                     }));
                 }
@@ -494,8 +410,8 @@
 
                     <div className="flex-grow bg-slate-100 flex flex-col relative overflow-auto h-96 lg:h-auto">
                         <div className="bg-white p-4 shadow-sm border-b flex justify-between items-center no-print sticky top-0 z-10">
-                            <h2 className="font-bold text-slate-700">{selectedOrder ? `${selectedOrder.codigo} (${packageLabels.length} Etq)` : 'Seleccione orden'}</h2>
-                            {selectedOrder && <button onClick={handlePrint} className="px-3 py-2 bg-slate-900 text-white rounded font-bold text-sm flex gap-2"><Icon name="printer" size={16}/> IMPRIMIR</button>}
+                            <h2 className="font-bold text-slate-700">{selectedOrder ? `${selectedOrder.codigo} (${packageLabels.length} PAQUETES)` : 'Seleccione orden'}</h2>
+                            {selectedOrder && <button onClick={handlePrint} className="px-3 py-2 bg-slate-900 text-white rounded font-bold text-sm flex gap-2"><Icon name="printer" size={16}/> IMPRIMIR TODO ({packageLabels.length})</button>}
                         </div>
                         <div className="flex-grow flex flex-col items-center p-4 lg:p-10 bg-slate-200 overflow-y-auto print-container">
                             {packageLabels.length > 0 ? ( packageLabels.map((labelData, index) => ( <div key={index} className="label-wrapper"><ProductionLabel labelData={labelData} /></div> )) ) : ( <div className="text-center text-slate-400 mt-20">Selecciona una orden</div> )}
