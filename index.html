@@ -16,6 +16,8 @@
     
     <script src="https://unpkg.com/html5-qrcode" type="text/javascript"></script>
 
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/html2pdf.js/0.10.1/html2pdf.bundle.min.js"></script>
+
     <script src="https://www.gstatic.com/firebasejs/10.7.1/firebase-app-compat.js"></script>
     <script src="https://www.gstatic.com/firebasejs/10.7.1/firebase-firestore-compat.js"></script>
 
@@ -25,7 +27,12 @@
         body { background-color: #f1f5f9; min-height: 100vh; font-family: 'Roboto Condensed', sans-serif; overflow: hidden; }
         @media (max-width: 1024px) { body { height: auto; overflow-y: auto; overflow-x: hidden; } }
         #reader a, #reader-hidden a { display: none !important; }
-        .label-wrapper { margin-bottom: 2rem; padding: 1rem; background: white; border-radius: 0.5rem; box-shadow: 0 10px 15px -3px rgba(0, 0, 0, 0.1); page-break-inside: avoid; }
+        
+        /* Estilos base de la etiqueta */
+        .label-wrapper { margin-bottom: 2rem; padding: 0; background: white; page-break-inside: avoid; display: flex; justify-content: center; }
+        /* El contenedor visual tiene sombra en pantalla, pero no afectará al PDF si seleccionamos el hijo directo o ajustamos margins */
+        .label-wrapper-screen { margin-bottom: 2rem; padding: 1rem; background: white; border-radius: 0.5rem; box-shadow: 0 10px 15px -3px rgba(0, 0, 0, 0.1); }
+
         .label-preview-container { width: 6in; height: 4in; background-color: white; position: relative; box-sizing: border-box; border: 2px solid #000; display: flex; flex-direction: column; overflow: hidden; }
         .lbl-row { display: flex; border-bottom: 2px solid #000; width: 100%; }
         .lbl-row:last-child { border-bottom: none; }
@@ -40,40 +47,16 @@
         .loader { border: 4px solid #f3f3f3; border-top: 4px solid #3498db; border-radius: 50%; width: 30px; height: 30px; animation: spin 1s linear infinite; }
         @keyframes spin { 0% { transform: rotate(0deg); } 100% { transform: rotate(360deg); } }
         
-        /* === ESTILOS DE IMPRESIÓN PARA ZEBRA (1 HOJA POR PAQUETE) === */
+        /* Ajustes para cuando se genera el PDF via JS */
+        .pdf-mode .label-wrapper-screen { box-shadow: none; margin: 0; padding: 0; margin-bottom: 0; border-radius: 0; }
+        .pdf-mode .label-wrapper-screen { break-after: page; page-break-after: always; }
+
         @media print {
             @page { size: 6in 4in; margin: 0mm; }
             html, body { height: auto !important; overflow: visible !important; background: white !important; margin: 0 !important; padding: 0 !important; }
             .no-print { display: none !important; }
-            
-            /* Contenedor principal se expande para mostrar TODAS las etiquetas */
-            .print-container { 
-                display: block !important; 
-                width: 100% !important; 
-                height: auto !important; 
-                margin: 0 !important; 
-                padding: 0 !important; 
-                position: static !important; 
-                overflow: visible !important;
-            }
-            
-            /* Cada etiqueta fuerza un salto de página al terminar */
-            .label-wrapper { 
-                display: block !important; 
-                width: 6in !important; 
-                height: 4in !important; 
-                margin: 0 !important; 
-                padding: 0 !important; 
-                border: none !important; 
-                box-shadow: none !important; 
-                border-radius: 0 !important; 
-                
-                /* ESTA LÍNEA HACE LA MAGIA: Salto de página después de cada una */
-                break-after: page; 
-                page-break-after: always; 
-                page-break-inside: avoid; 
-            }
-            
+            .print-container { display: block !important; width: 100% !important; height: auto !important; margin: 0 !important; padding: 0 !important; position: static !important; overflow: visible !important;}
+            .label-wrapper-screen { display: block !important; width: 6in !important; height: 4in !important; margin: 0 !important; padding: 0 !important; border: none !important; box-shadow: none !important; border-radius: 0 !important; break-after: page; page-break-after: always; page-break-inside: avoid; }
             .label-preview-container { border: 2px solid #000 !important; width: 6in !important; height: 4in !important; }
         }
     </style>
@@ -354,6 +337,7 @@
             const [packageLabels, setPackageLabels] = useState([]); 
             const [filterText, setFilterText] = useState('');
             const [showScanner, setShowScanner] = useState(false);
+            const [isGeneratingPdf, setIsGeneratingPdf] = useState(false); // Estado para el loading
 
             const generatePackageLabels = (order) => {
                 if (order.progreso && order.progreso.length > 0) {
@@ -391,6 +375,37 @@
 
             const handlePrint = () => { if(packageLabels.length > 0) window.print(); };
 
+            // === FUNCIÓN NUEVA PARA DESCARGAR PDF ===
+            const handleDownloadPDF = () => {
+                if (packageLabels.length === 0) return;
+                setIsGeneratingPdf(true);
+                
+                // Seleccionamos el contenedor que tiene todas las etiquetas
+                const element = document.querySelector('.print-container');
+                
+                // Opciones especificas para 6x4 pulgadas
+                const opt = {
+                    margin:       0,
+                    filename:     `${selectedOrder.codigo || 'orden'}_${packageLabels.length}pqts.pdf`,
+                    image:        { type: 'jpeg', quality: 0.98 },
+                    html2canvas:  { scale: 2, useCORS: true, logging: false, backgroundColor: '#ffffff' }, // Fondo blanco forzado
+                    jsPDF:        { unit: 'in', format: [6, 4], orientation: 'landscape' }
+                };
+
+                // Añadir clase temporal para quitar sombras y margenes durante la generación
+                element.classList.add('pdf-mode');
+
+                html2pdf().set(opt).from(element).save().then(() => {
+                    element.classList.remove('pdf-mode');
+                    setIsGeneratingPdf(false);
+                }).catch(err => {
+                    console.error(err);
+                    element.classList.remove('pdf-mode');
+                    setIsGeneratingPdf(false);
+                    alert("Error al generar PDF");
+                });
+            };
+
             return (
                 <div className="flex flex-col lg:flex-row h-screen w-full">
                     <div className="w-full lg:w-80 bg-slate-800 text-white flex flex-col border-r border-slate-700 shadow-xl no-print z-10 shrink-0 h-64 lg:h-auto">
@@ -411,10 +426,19 @@
                     <div className="flex-grow bg-slate-100 flex flex-col relative overflow-auto h-96 lg:h-auto">
                         <div className="bg-white p-4 shadow-sm border-b flex justify-between items-center no-print sticky top-0 z-10">
                             <h2 className="font-bold text-slate-700">{selectedOrder ? `${selectedOrder.codigo} (${packageLabels.length} PAQUETES)` : 'Seleccione orden'}</h2>
-                            {selectedOrder && <button onClick={handlePrint} className="px-3 py-2 bg-slate-900 text-white rounded font-bold text-sm flex gap-2"><Icon name="printer" size={16}/> IMPRIMIR TODO ({packageLabels.length})</button>}
+                            {selectedOrder && (
+                                <div className="flex gap-2">
+                                    <button onClick={handleDownloadPDF} disabled={isGeneratingPdf} className={`px-3 py-2 text-white rounded font-bold text-sm flex gap-2 ${isGeneratingPdf ? 'bg-slate-400 cursor-wait' : 'bg-red-600 hover:bg-red-700 shadow-md'}`}>
+                                        <Icon name="download" size={16}/> {isGeneratingPdf ? 'GENERANDO...' : 'DESCARGAR PDF'}
+                                    </button>
+                                    <button onClick={handlePrint} className="px-3 py-2 bg-slate-900 text-white rounded font-bold text-sm flex gap-2 hover:bg-slate-800 shadow-md">
+                                        <Icon name="printer" size={16}/> IMPRIMIR
+                                    </button>
+                                </div>
+                            )}
                         </div>
                         <div className="flex-grow flex flex-col items-center p-4 lg:p-10 bg-slate-200 overflow-y-auto print-container">
-                            {packageLabels.length > 0 ? ( packageLabels.map((labelData, index) => ( <div key={index} className="label-wrapper"><ProductionLabel labelData={labelData} /></div> )) ) : ( <div className="text-center text-slate-400 mt-20">Selecciona una orden</div> )}
+                            {packageLabels.length > 0 ? ( packageLabels.map((labelData, index) => ( <div key={index} className="label-wrapper-screen"><ProductionLabel labelData={labelData} /></div> )) ) : ( <div className="text-center text-slate-400 mt-20">Selecciona una orden</div> )}
                         </div>
                     </div>
 
