@@ -176,10 +176,11 @@
                         <div style={{display: 'flex', flexDirection: 'column'}}>
                             <div className="lbl-title">FECHA DE ENTREGA</div><div className="lbl-medium" style={{fontSize: '20px'}}>{fechaEntrega}</div>
                         </div>
-                        <div style={{display: 'flex', flexDirection: 'column', alignItems: 'flex-end', flexGrow: 1}}>
+                        {/* FIX: Eliminar flexGrow y añadir flexShrink: 0 para asegurar que el contenedor del código de barras no exceda su espacio vertical */}
+                        <div style={{display: 'flex', flexDirection: 'column', alignItems: 'flex-end', flexShrink: 0}}>
                             <svg ref={svgRef} style={{maxWidth: '2.5in', width: '2.5in', height: 'auto'}}></svg>
-                            {/* FIX: Se eliminó la clase 'mt-1' del div de abajo para evitar el desborde que generaba la página extra en el PDF. */}
-                            <div className="text-[10px] font-mono text-center w-full bg-white px-1 relative z-10">{barcodeValue}</div>
+                            {/* FIX: Añadir whitespace-nowrap para evitar que el texto del código se envuelva y rompa la altura */}
+                            <div className="text-[10px] font-mono text-center w-full bg-white px-1 relative z-10 whitespace-nowrap">{barcodeValue}</div>
                         </div>
                     </div>
                 </div>
