@@ -3,7 +3,7 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>Generador de Papeletas - Cirineo</title>
+    <title>Generador de Papeletas - Cirineo v3.4</title>
     
     <link rel="icon" href="https://raw.githubusercontent.com/jesusvn1993mplvt3-ai/CIRINEO/refs/heads/main/icon.ico">
     
@@ -22,51 +22,11 @@
     <link href="https://fonts.googleapis.com/css2?family=Oswald:wght@400;700&family=Roboto+Condensed:wght@400;700&display=swap" rel="stylesheet">
 
     <style>
-        /* ESTILOS GENERALES DE LA APP */
-        body { 
-            background-color: #f1f5f9; 
-            min-height: 100vh;
-            min-height: 100dvh; 
-            font-family: 'Roboto Condensed', sans-serif; 
-            overflow: hidden; 
-        }
-        
-        /* Ajuste para móviles y Tablets en Vertical */
-        @media (max-width: 1024px) {
-            body { 
-                height: auto; 
-                overflow-y: auto; 
-                overflow-x: hidden;
-            }
-        }
-
-        /* Ocultar publicidad de la librería de escáner */
+        body { background-color: #f1f5f9; min-height: 100vh; font-family: 'Roboto Condensed', sans-serif; overflow: hidden; }
+        @media (max-width: 1024px) { body { height: auto; overflow-y: auto; overflow-x: hidden; } }
         #reader a, #reader-hidden a { display: none !important; }
-        #reader__dashboard_section_csr span { display: none !important; }
-
-        /* ESTILOS DE LA ETIQUETA */
-        .label-wrapper {
-            margin-bottom: 2rem;
-            padding: 1rem;
-            background: white;
-            border-radius: 0.5rem;
-            box-shadow: 0 10px 15px -3px rgba(0, 0, 0, 0.1);
-            page-break-inside: avoid;
-        }
-        
-        .label-preview-container {
-            width: 6in;
-            height: 4in;
-            background-color: white;
-            position: relative;
-            box-sizing: border-box;
-            border: 2px solid #000;
-            display: flex;
-            flex-direction: column;
-            overflow: hidden;
-        }
-
-        /* Estilos internos de la etiqueta */
+        .label-wrapper { margin-bottom: 2rem; padding: 1rem; background: white; border-radius: 0.5rem; box-shadow: 0 10px 15px -3px rgba(0, 0, 0, 0.1); page-break-inside: avoid; }
+        .label-preview-container { width: 6in; height: 4in; background-color: white; position: relative; box-sizing: border-box; border: 2px solid #000; display: flex; flex-direction: column; overflow: hidden; }
         .lbl-row { display: flex; border-bottom: 2px solid #000; width: 100%; }
         .lbl-row:last-child { border-bottom: none; }
         .lbl-col { border-right: 2px solid #000; padding: 4px 8px; display: flex; flex-direction: column; justify-content: center; overflow: hidden; }
@@ -75,26 +35,16 @@
         .lbl-big { font-family: 'Oswald', sans-serif; font-weight: 700; font-size: 42px; line-height: 0.9; color: #000; white-space: nowrap; }
         .lbl-medium { font-family: 'Oswald', sans-serif; font-weight: 700; font-size: 26px; line-height: 1; color: #000; white-space: nowrap; }
         .lbl-small { font-size: 16px; font-weight: 700; color: #000; }
-        
-        .row-header { height: 18%; }
-        .row-info { height: 12%; }
-        .row-desc { height: 10%; align-items: center; }
-        .row-metrics { height: 22%; }
-        .row-details { height: 23%; }
-        .row-footer { height: 15%; }
-
+        .row-header { height: 18%; } .row-info { height: 12%; } .row-desc { height: 10%; align-items: center; }
+        .row-metrics { height: 22%; } .row-details { height: 23%; } .row-footer { height: 15%; }
         .loader { border: 4px solid #f3f3f3; border-top: 4px solid #3498db; border-radius: 50%; width: 30px; height: 30px; animation: spin 1s linear infinite; }
-        .loader.border-white { border-top-color: white; }
         @keyframes spin { 0% { transform: rotate(0deg); } 100% { transform: rotate(360deg); } }
-
-        /* IMPRESIÓN (6x4 EXACTO) */
         @media print {
             @page { size: 6in 4in; margin: 0mm; }
             html, body { height: auto !important; overflow: visible !important; background: white !important; margin: 0 !important; padding: 0 !important; }
             .no-print { display: none !important; }
             .print-container { display: block !important; width: 100% !important; height: auto !important; margin: 0 !important; padding: 0 !important; position: static !important; }
             .label-wrapper { display: block !important; width: 6in !important; height: 4in !important; margin: 0 !important; padding: 0 !important; border: none !important; box-shadow: none !important; border-radius: 0 !important; break-after: page; page-break-after: always; page-break-inside: avoid; }
-            .label-wrapper:last-child { break-after: auto; page-break-after: auto; }
             .label-preview-container { border: 2px solid #000 !important; width: 6in !important; height: 4in !important; }
         }
     </style>
@@ -105,7 +55,6 @@
     <script type="text/babel">
         const { useState, useEffect, useRef, useMemo, useCallback } = React;
 
-        // --- CONFIGURACIÓN DE FIREBASE ---
         const firebaseConfig = {
             apiKey: "AIzaSyBqHgV4vDat1-VmZfKbiPg7nuiX-ROcexw",
             authDomain: "cirineo-cec21.firebaseapp.com",
@@ -120,31 +69,29 @@
         const db = firebase.firestore();
         const FieldValue = firebase.firestore.FieldValue; 
 
-        // --- COMPONENTE ICONO ---
         const Icon = ({ name, size = 18, className }) => {
             const containerRef = useRef(null);
             useEffect(() => {
                 if (containerRef.current && lucide.icons[name]) {
-                    containerRef.current.innerHTML = ''; 
-                    const svgString = lucide.icons[name].toSvg({ width: size, height: size, class: className });
-                    containerRef.current.innerHTML = svgString;
+                    containerRef.current.innerHTML = lucide.icons[name].toSvg({ width: size, height: size, class: className });
                 }
             }, [name, size, className]);
             return <div ref={containerRef} className="inline-block" style={{ width: size, height: size }}></div>;
         };
 
-        // --- COMPONENTE DE ETIQUETA ---
         const ProductionLabel = ({ labelData }) => {
             const svgRef = useRef(null);
             const order = labelData; 
-            const subPiece = order.subPiecesData && order.subPiecesData.length > 0 ? order.subPiecesData[0] : {};
+            // Buscar datos de la pieza específica para mostrar talla y peso correcto
+            const subPiece = order.subPiecesData ? order.subPiecesData.find(sp => sp.pieza === order.piezaNombre) : (order.subPiecesData?.[0] || {});
+            
             const materialNylon = order.threading ? order.threading.find(t => t.material && t.material.toUpperCase().includes('NYLON')) : null;
             const materialLycra = order.threading ? order.threading.find(t => t.material && t.material.toUpperCase().includes('LYCRA')) : null;
             const lycraText = materialLycra ? materialLycra.material.replace(/LYCRA/i, '').trim() : (order.threading && order.threading[1] ? order.threading[1].material : 'N/A');
             const nylonText = materialNylon ? materialNylon.material.replace(/NYLON/i, '').trim() : (order.threading && order.threading[0] ? order.threading[0].material : 'N/A');
-            const currentPackageDisplay = order.displayPackageId || '1/1';
-            const piecesInPackage = order.piecesInPackage || (order.packageSize === 'VARIO' ? 'VAR' : (order.packageSize || 50));
-            const barcodeValue = order.packageCode || `${order.codigo}-${order.partida}-1`;
+            
+            // AQUI ESTA EL CAMBIO DEL CODIGO DE BARRAS
+            const barcodeValue = order.packageCode; 
             const fechaEntrega = order.fechaEntrega || new Date(Date.now() + 7 * 24 * 60 * 60 * 1000).toLocaleDateString('es-MX');
 
             useEffect(() => {
@@ -176,15 +123,15 @@
                     </div>
                     <div className="lbl-row row-desc">
                         <div className="lbl-col" style={{flexDirection: 'row', alignItems: 'baseline', gap: '10px', width: '100%'}}>
-                            <span className="lbl-title">DESCRIPCION:</span><span style={{fontSize: '16px', fontWeight: 'bold'}}>{subPiece.pieza || 'ESTANDAR'}</span>
+                            <span className="lbl-title">DESCRIPCION:</span><span style={{fontSize: '16px', fontWeight: 'bold'}}>{order.piezaNombre || subPiece?.pieza || 'ESTANDAR'}</span>
                         </div>
                     </div>
                     <div className="lbl-row row-metrics">
                         <div className="lbl-col" style={{width: '33.33%', textAlign: 'center'}}>
-                            <div className="lbl-title" style={{fontSize: '11px'}}>PAQUETE<br/>ACTUAL</div><div className="lbl-big" style={{fontSize: '48px'}}>{currentPackageDisplay}</div>
+                            <div className="lbl-title" style={{fontSize: '11px'}}>PAQUETE<br/>ACTUAL</div><div className="lbl-big" style={{fontSize: '48px'}}>{order.displayPackageId}</div>
                         </div>
                         <div className="lbl-col" style={{width: '33.33%', backgroundColor: '#e0e0e0', textAlign: 'center'}}>
-                            <div className="lbl-title" style={{fontSize: '11px'}}>PIEZAS EN<br/>PAQUETE</div><div className="lbl-big" style={{fontSize: '48px'}}>{piecesInPackage}</div>
+                            <div className="lbl-title" style={{fontSize: '11px'}}>PIEZAS EN<br/>PAQUETE</div><div className="lbl-big" style={{fontSize: '48px'}}>{order.piecesInPackage}</div>
                         </div>
                         <div className="lbl-col" style={{width: '33.33%', textAlign: 'center'}}>
                             <div className="lbl-title">MAQUINA</div><div className="lbl-big" style={{fontSize: '48px'}}>{order.maquina || '0'}</div>
@@ -201,13 +148,13 @@
                         </div>
                         <div style={{width: '50%', display: 'grid', gridTemplateColumns: '1fr 1fr', gridTemplateRows: '1fr 1fr'}}>
                             <div className="lbl-col" style={{borderBottom: '1px solid black', borderRight: '1px solid black', padding: '2px'}}>
-                                <div className="lbl-title">TALLA</div><div className="lbl-medium" style={{fontSize: '20px'}}>{subPiece.talla || 'UNI'}</div>
+                                <div className="lbl-title">TALLA</div><div className="lbl-medium" style={{fontSize: '20px'}}>{subPiece?.talla || 'UNI'}</div>
                             </div>
                             <div className="lbl-col" style={{borderBottom: '1px solid black', padding: '2px'}}>
-                                <div className="lbl-title">PESO (g)</div><div className="lbl-small">{subPiece.peso || '---'}</div>
+                                <div className="lbl-title">PESO (g)</div><div className="lbl-small">{subPiece?.peso || '---'}</div>
                             </div>
                             <div className="lbl-col" style={{gridColumn: 'span 2', padding: '2px', flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center'}}>
-                                <div className="lbl-title">TIEMPO (min)</div><div className="lbl-small" style={{fontSize: '20px', marginRight: '10px'}}>{subPiece.tiempo || '---'}</div>
+                                <div className="lbl-title">TIEMPO (min)</div><div className="lbl-small" style={{fontSize: '20px', marginRight: '10px'}}>{subPiece?.tiempo || '---'}</div>
                             </div>
                         </div>
                     </div>
@@ -217,201 +164,149 @@
                         </div>
                         <div style={{display: 'flex', flexDirection: 'column', alignItems: 'flex-end', flexGrow: 1}}>
                             <svg ref={svgRef} style={{maxWidth: '2.5in', width: '2.5in', height: 'auto'}}></svg>
-                            <div style={{fontSize: '10px', marginTop: '-5px'}}>{barcodeValue}</div>
+                            <div className="text-[10px] font-mono text-center w-full mt-1 bg-white px-1 relative z-10">{barcodeValue}</div>
                         </div>
                     </div>
                 </div>
             );
         };
 
-        // --- COMPONENTE MODAL DE ESCANEO RÁPIDO (NUEVO) ---
         const QuickScannerModal = ({ isVisible, onClose, allOrders, onScanSaved }) => {
-            const [scans, setScans] = useState([]); // Buffer: ['COD-P-1', 'COD-P-2', ...]
+            const [scans, setScans] = useState([]);
             const [scanStatus, setScanStatus] = useState({ message: 'Cargando cámara...', type: 'info' });
             const [isSaving, setIsSaving] = useState(false);
             const scannerRef = useRef(null);
 
-            // Camera setup
             useEffect(() => {
                 if (isVisible) {
                     setScans([]);
-                    setScanStatus({ message: 'Escanee los códigos de barra...', type: 'info' });
+                    setScanStatus({ message: 'Escanee los códigos únicos de los paquetes...', type: 'info' });
                     
                     setTimeout(() => {
                         const html5QrcodeScanner = new Html5QrcodeScanner(
                             "reader", 
-                            { 
-                                fps: 10, 
-                                qrbox: { width: 250, height: 150 }, 
-                                aspectRatio: 1.0,
-                                videoConstraints: { facingMode: "environment" }
-                            },
+                            { fps: 10, qrbox: { width: 250, height: 150 }, aspectRatio: 1.0, videoConstraints: { facingMode: "environment" } },
                             false
                         );
 
                         const onScanSuccess = (decodedText) => {
                             handleQuickScan(decodedText);
-                            // Pausar y reanudar para evitar múltiples escaneos del mismo código
                             html5QrcodeScanner.pause(); 
                             setTimeout(() => html5QrcodeScanner.resume(), 1500); 
                         };
 
-                        html5QrcodeScanner.render(onScanSuccess, (errorMessage) => {
-                            // Ignorar errores de lectura continua
-                        });
-                        
+                        html5QrcodeScanner.render(onScanSuccess, (errorMessage) => {});
                         scannerRef.current = html5QrcodeScanner;
                     }, 100);
                 } else {
                     if (scannerRef.current) {
-                        scannerRef.current.clear().catch(err => console.error("Error clearing scanner", err));
+                        scannerRef.current.clear().catch(err => console.error(err));
                         scannerRef.current = null;
                     }
                 }
-                
-                return () => {
-                    if (scannerRef.current) {
-                        scannerRef.current.clear().catch(err => console.error("Cleanup scanner", err));
-                    }
-                };
+                return () => { if (scannerRef.current) scannerRef.current.clear().catch(err => {}); };
             }, [isVisible]);
 
+            // --- LÓGICA DE ESCANEO MEJORADA: BUSCA EL CÓDIGO ÚNICO EN LAS ÓRDENES ---
             const handleQuickScan = (rawCode) => {
                 if (!rawCode) return;
-                const normalizedCode = rawCode.trim().toUpperCase().replace(/'/g, '-').replace(/\?/g, '_');
+                const scannedCode = rawCode.trim();
 
-                if (scans.includes(normalizedCode)) {
-                    setScanStatus({ message: `Código ${normalizedCode} ya está en la lista.`, type: 'warning' });
+                if (scans.includes(scannedCode)) {
+                    setScanStatus({ message: `Código ${scannedCode} ya escaneado.`, type: 'warning' });
                     return;
                 }
 
-                const codeParts = normalizedCode.split('-');
-                if (codeParts.length !== 3) {
-                    setScanStatus({ message: `Error formato: ${normalizedCode}.`, type: 'error' });
+                // BUSQUEDA INTELIGENTE
+                let foundPackage = null;
+                let foundOrder = null;
+
+                // Iterar sobre todas las órdenes para encontrar quién tiene ese codigoUnico
+                for (const order of allOrders) {
+                    if (order.progreso) {
+                        const pkg = order.progreso.find(p => p.codigoUnico === scannedCode);
+                        if (pkg) {
+                            foundPackage = pkg;
+                            foundOrder = order;
+                            break;
+                        }
+                    }
+                }
+
+                if (!foundPackage || !foundOrder) {
+                    setScanStatus({ message: `Código ${scannedCode} NO encontrado en ninguna orden activa.`, type: 'error' });
                     return;
                 }
 
-                setScans(prev => [...prev, normalizedCode]);
-                setScanStatus({ message: `Escaneado: ${normalizedCode}. Total: ${scans.length + 1}`, type: 'success' });
+                // Si lo encontramos, lo agregamos a la lista, pero guardando los metadatos necesarios
+                // Usaremos un string JSON interno para guardar temporalmente o un objeto si react lo permite en estado
+                // Para la lista visual solo mostramos el código, pero internamente necesitamos más datos.
+                setScans(prev => [...prev, scannedCode]);
+                setScanStatus({ message: `¡Encontrado! ${foundPackage.piezaNombre} (${foundPackage.paqueteNum}/${foundPackage.paquetesDePieza})`, type: 'success' });
             };
 
-            const handleRemoveScan = (codeToRemove) => {
-                setScans(prev => prev.filter(code => code !== codeToRemove));
-            };
+            const handleRemoveScan = (codeToRemove) => setScans(prev => prev.filter(code => code !== codeToRemove));
 
             const handleSaveAll = async () => {
                 if (scans.length === 0 || isSaving) return;
                 setIsSaving(true);
-                setScanStatus({ message: `Guardando ${scans.length} registros...`, type: 'info' });
+                setScanStatus({ message: `Guardando registros...`, type: 'info' });
 
                 const successfulScans = [];
                 const failedScans = [];
-                const uniqueOrderIdsToArchive = new Set();
                 const tejedoraName = "Balta"; 
 
-                // 1. Procesar y guardar cada código
-                for (const normalizedCode of scans) {
+                for (const scannedCode of scans) {
                     try {
-                        const codeParts = normalizedCode.split('-');
-                        if (codeParts.length !== 3) {
-                            failedScans.push(`${normalizedCode} (Formato inválido)`);
-                            continue;
-                        }
-                        const [modelCode, partidaPart, packageIndexStr] = codeParts;
-                        const packageIndex = Number(packageIndexStr);
-
-                        const orderToScan = allOrders.find(o => 
-                            String(o.codigo).toUpperCase() === modelCode && 
-                            String(o.partida).toUpperCase() === partidaPart
-                        );
-
-                        if (!orderToScan) {
-                            failedScans.push(`${normalizedCode} (Orden no encontrada)`);
-                            continue;
+                        // Re-buscar la data fresca (por seguridad)
+                        let foundPackage = null;
+                        let foundOrder = null;
+                        for (const order of allOrders) {
+                            if (order.progreso) {
+                                const pkg = order.progreso.find(p => p.codigoUnico === scannedCode);
+                                if (pkg) { foundPackage = pkg; foundOrder = order; break; }
+                            }
                         }
 
-                        const totalPieces = orderToScan.totalPedido || 0;
-                        const packageSizeValue = orderToScan.packageSize === 'VARIO' || !orderToScan.packageSize ? 50 : (Number(orderToScan.packageSize) || 50); 
-                        const totalPackages = totalPieces > 0 ? Math.ceil(totalPieces / packageSizeValue) : 1; 
-                        const piecesInThisPackage = (packageIndex < totalPackages) ? packageSizeValue : (totalPieces % packageSizeValue || packageSizeValue);
+                        if (!foundPackage) { failedScans.push(scannedCode); continue; }
 
-                        if (packageIndex > totalPackages || packageIndex < 1) {
-                            failedScans.push(`${normalizedCode} (Pqte fuera de rango)`);
-                            continue;
-                        }
-                        
-                        const globalScanCheck = await db.collection('registro_produccion').where('codigo_paquete', '==', normalizedCode).get();
+                        // Verificar duplicados globales
+                        const globalScanCheck = await db.collection('registro_produccion').where('codigo_paquete', '==', scannedCode).get();
                         if (!globalScanCheck.empty) {
-                            failedScans.push(`${normalizedCode} (Duplicado)`);
+                            failedScans.push(`${scannedCode} (Duplicado)`);
                             continue;
                         }
 
                         await db.collection('registro_produccion').doc().set({
-                            codigo_paquete: normalizedCode, 
-                            orderId: String(orderToScan.id), 
+                            codigo_paquete: scannedCode, // Guardamos el código único
+                            orderId: String(foundOrder.id), 
                             fecha: FieldValue.serverTimestamp(),
-                            fecha_legible: new Date().toLocaleDateString('es-MX', {
-                                day: '2-digit', month: '2-digit', year: 'numeric', hour: '2-digit', minute: '2-digit'
-                            }).replace(/\//g, '/'), 
+                            fecha_legible: new Date().toLocaleDateString('es-MX', { day: '2-digit', month: '2-digit', year: 'numeric', hour: '2-digit', minute: '2-digit' }).replace(/\//g, '/'), 
                             tejedor: tejedoraName,
                             tipo: "produccion",
-                            modelo: orderToScan.codigo,
-                            partida: orderToScan.partida,
-                            paquete_indice: packageIndex,
-                            paquete_total: totalPackages,
-                            piezas_en_paquete: piecesInThisPackage
+                            modelo: foundOrder.codigo,
+                            partida: foundOrder.partida,
+                            paquete_indice: foundPackage.paqueteNum, // IMPORTANTE: Indice correcto
+                            paquete_total: foundPackage.paquetesDePieza,
+                            piezas_en_paquete: foundPackage.cantidad
                         });
                         
-                        successfulScans.push(normalizedCode);
-                        uniqueOrderIdsToArchive.add(orderToScan.id);
+                        successfulScans.push(scannedCode);
 
                     } catch (error) {
-                        console.error("Error processing scan:", normalizedCode, error);
-                        failedScans.push(`${normalizedCode} (Error DB)`);
+                        console.error("Error saving:", error);
+                        failedScans.push(`${scannedCode} (Error)`);
                     }
                 }
 
-                // 2. Archivar las órdenes cuyas papeletas fueron escaneadas
-                if (uniqueOrderIdsToArchive.size > 0) {
-                    setScanStatus({ message: `Archivando ${uniqueOrderIdsToArchive.size} órdenes...`, type: 'info' });
-                    for (const orderId of uniqueOrderIdsToArchive) {
-                        try {
-                            const orderToArchive = allOrders.find(o => String(o.id) === String(orderId));
-                            if (orderToArchive) {
-                                // Usar el orderId como clave para evitar duplicados del archivo
-                                const archiveDocRef = db.collection('papeletas_escaneadas_archivadas').doc(String(orderId));
-                                const archiveDoc = await archiveDocRef.get();
-                                
-                                if (!archiveDoc.exists) {
-                                    await archiveDocRef.set({
-                                        ...orderToArchive, // Copia completa de la orden
-                                        archivadoPorScan: FieldValue.serverTimestamp(),
-                                    });
-                                }
-                            }
-                        } catch (e) {
-                            console.error(`Error al archivar orden ${orderId}:`, e);
-                        }
-                    }
-                }
-
-                // 3. Finalizar
                 setIsSaving(false);
                 if (successfulScans.length > 0) {
                     onScanSaved(); 
                     onClose(); 
-                    alert(`Proceso Terminado:\n- Guardados: ${successfulScans.length}\n- Fallidos: ${failedScans.length}\n${failedScans.length > 0 ? '\nFallidos (revisar): ' + failedScans.join(', ') : ''}`);
+                    alert(`Guardados: ${successfulScans.length}. Fallidos: ${failedScans.length}`);
                 } else {
-                    setScanStatus({ message: `Error: No se guardó ningún código. ${failedScans.length} fallidos.`, type: 'error' });
-                    setScans([]); 
+                    setScanStatus({ message: `Error al guardar.`, type: 'error' });
                 }
-            };
-
-            const statusClasses = {
-                info: 'bg-blue-100 text-blue-800',
-                success: 'bg-green-100 text-green-800',
-                warning: 'bg-yellow-100 text-yellow-800',
-                error: 'bg-red-100 text-red-800',
             };
 
             if (!isVisible) return null;
@@ -419,67 +314,29 @@
             return (
                 <div className="fixed inset-0 bg-black/80 z-[100] flex flex-col items-center justify-center p-4">
                     <div className="w-full max-w-2xl bg-white rounded-xl shadow-2xl overflow-hidden flex flex-col max-h-[95vh]">
-                        
-                        {/* Header */}
                         <div className="flex justify-between items-center p-4 bg-slate-800 text-white">
-                            <h2 className="font-bold text-xl flex items-center gap-2"><Icon name="scan"/> ESCANEO RÁPIDO Y ARCHIVO</h2>
-                            <button onClick={onClose} className="bg-red-600 hover:bg-red-700 text-white px-3 py-1.5 rounded text-sm font-bold transition">
-                                CERRAR
-                            </button>
+                            <h2 className="font-bold text-xl flex items-center gap-2"><Icon name="scan"/> ESCANEO DE PAQUETES</h2>
+                            <button onClick={onClose} className="bg-red-600 hover:bg-red-700 text-white px-3 py-1.5 rounded text-sm font-bold">CERRAR</button>
                         </div>
-
-                        {/* Body: Scanner and List */}
                         <div className="flex flex-col md:flex-row flex-grow min-h-0">
-                            
-                            {/* Cámara */}
                             <div className="w-full md:w-1/2 bg-black flex flex-col justify-center items-center p-2 relative">
                                 <div id="reader" className="w-full aspect-video md:aspect-square bg-black"></div>
-                                <div className={`mt-2 p-2 rounded text-xs text-center font-medium w-full ${statusClasses[scanStatus.type]}`}>{scanStatus.message}</div>
+                                <div className={`mt-2 p-2 rounded text-xs text-center font-medium w-full bg-slate-100`}>{scanStatus.message}</div>
                             </div>
-
-                            {/* Lista y Acciones */}
                             <div className="w-full md:w-1/2 flex flex-col p-4">
-                                <h3 className="font-bold text-slate-700 mb-3 flex items-center gap-1">
-                                    <Icon name="list-checks" size={18}/> Códigos Pendientes ({scans.length})
-                                </h3>
-                                
+                                <h3 className="font-bold text-slate-700 mb-3">Códigos Leídos ({scans.length})</h3>
                                 <div className="flex-grow overflow-y-auto border border-slate-300 rounded p-2 mb-4 bg-slate-50">
-                                    {scans.length === 0 ? (
-                                        <p className="text-sm text-slate-500 italic text-center p-4">Aún no hay códigos escaneados.</p>
-                                    ) : (
-                                        <ul className="space-y-1">
-                                            {scans.map(code => (
-                                                <li key={code} className="flex justify-between items-center p-2 bg-white rounded shadow-sm border border-slate-200">
-                                                    <span className="font-mono text-sm font-bold text-slate-800">{code}</span>
-                                                    <button 
-                                                        onClick={() => handleRemoveScan(code)}
-                                                        className="text-red-500 hover:text-red-700 p-1 rounded-full bg-red-50 transition"
-                                                        title="Descartar"
-                                                    >
-                                                        <Icon name="x" size={14}/>
-                                                    </button>
-                                                </li>
-                                            ))}
-                                        </ul>
-                                    )}
+                                    <ul className="space-y-1">
+                                        {scans.map(code => (
+                                            <li key={code} className="flex justify-between items-center p-2 bg-white rounded shadow-sm border border-slate-200">
+                                                <span className="font-mono text-sm font-bold text-slate-800">{code}</span>
+                                                <button onClick={() => handleRemoveScan(code)} className="text-red-500"><Icon name="x" size={14}/></button>
+                                            </li>
+                                        ))}
+                                    </ul>
                                 </div>
-
-                                <button 
-                                    onClick={handleSaveAll}
-                                    disabled={scans.length === 0 || isSaving}
-                                    className={`w-full py-3 rounded-lg font-bold text-white transition shadow-lg flex items-center justify-center gap-2 ${scans.length === 0 || isSaving ? 'bg-green-400 cursor-not-allowed' : 'bg-green-600 hover:bg-green-700'}`}
-                                >
-                                    {isSaving ? (
-                                        <>
-                                            <div className="loader w-4 h-4 border-white"></div>
-                                            Guardando...
-                                        </>
-                                    ) : (
-                                        <>
-                                            <Icon name="save" size={20}/>
-                                            GUARDAR {scans.length} CÓDIGOS
-                                        </>
-                                    )}
+                                <button onClick={handleSaveAll} disabled={scans.length === 0 || isSaving} className={`w-full py-3 rounded-lg font-bold text-white ${scans.length === 0 || isSaving ? 'bg-slate-400' : 'bg-green-600'}`}>
+                                    {isSaving ? 'Guardando...' : 'GUARDAR TODO'}
                                 </button>
                             </div>
                         </div>
@@ -488,20 +345,14 @@
             );
         };
 
-        // --- COMPONENTE RASTREADOR (BARRA LATERAL DERECHA) ---
         const ScanTracker = ({ selectedOrder, packageLabels, onOpenQuickScan }) => {
             const [scannedData, setScannedData] = useState([]);
             const orderId = selectedOrder?.id;
-
-            // Cargar datos de escaneo solo para la orden seleccionada
             useEffect(() => {
                 if (!orderId) { setScannedData([]); return; }
-                const unsubscribe = db.collection('registro_produccion')
-                    .where('orderId', '==', String(orderId)) 
-                    .onSnapshot(snapshot => {
-                        const data = snapshot.docs.map(doc => doc.data());
-                        setScannedData(data);
-                    });
+                const unsubscribe = db.collection('registro_produccion').where('orderId', '==', String(orderId)).onSnapshot(snapshot => {
+                    setScannedData(snapshot.docs.map(doc => doc.data()));
+                });
                 return () => unsubscribe();
             }, [orderId]);
             
@@ -511,7 +362,6 @@
                 const packages = packageLabels.map(label => ({
                     ...label,
                     isScanned: scannedCodes.has(label.packageCode),
-                    scanTime: scannedData.find(d => d.codigo_paquete === label.packageCode)?.fecha_legible || null, 
                 }));
                 return {
                     scannedPackages: packages.filter(p => p.isScanned),
@@ -522,194 +372,93 @@
             return (
                 <div className="w-full lg:w-96 bg-white border-l border-slate-200 flex flex-col no-print relative shrink-0">
                     <div className="p-4 border-b bg-slate-50">
-                        <h3 className="font-bold text-lg flex items-center gap-2 text-slate-800 mb-3"><Icon name="scan"/> Control de Paquetes</h3>
-                        
-                        <button 
-                            onClick={onOpenQuickScan}
-                            className="w-full py-2 bg-blue-600 text-white rounded font-bold hover:bg-blue-700 transition shadow-md flex items-center justify-center gap-2 text-sm"
-                        >
-                            <Icon name="camera" size={18} /> INICIAR ESCANEO RÁPIDO
-                        </button>
+                        <h3 className="font-bold text-lg flex items-center gap-2 text-slate-800 mb-3"><Icon name="scan"/> Control</h3>
+                        <button onClick={onOpenQuickScan} className="w-full py-2 bg-blue-600 text-white rounded font-bold hover:bg-blue-700 transition shadow-md flex items-center justify-center gap-2 text-sm"><Icon name="camera" size={18} /> ESCANEAR</button>
                     </div>
-
-                    {selectedOrder ? (
-                        <div className="flex-grow overflow-y-auto p-3 space-y-4 max-h-96 lg:max-h-full">
-                            <h4 className="font-bold text-slate-800 text-sm mb-3">Estatus de: {selectedOrder.codigo}</h4>
-
-                            <div className="bg-red-50 p-3 rounded">
-                                <h4 className="font-bold text-red-800 flex items-center gap-1 mb-2 text-xs"><Icon name="clock" size={12}/> PENDIENTES ({pendingPackages.length})</h4>
-                                <div className="grid grid-cols-4 gap-2">
-                                    {pendingPackages.map(p => (
-                                        <div key={p.packageCode} className="p-2 text-center bg-white border border-red-300 rounded text-sm font-mono font-bold text-slate-700">{p.packageIndex}</div>
-                                    ))}
-                                    {pendingPackages.length === 0 && <p className="text-sm text-red-600 col-span-4 italic text-center">¡Completado!</p>}
-                                </div>
-                            </div>
-                            <div className="bg-green-50 p-3 rounded">
-                                <h4 className="font-bold text-green-800 flex items-center gap-1 mb-2 text-xs"><Icon name="check-circle" size={12}/> LISTOS ({scannedPackages.length})</h4>
-                                <div className="grid grid-cols-4 gap-2">
-                                    {scannedPackages.map(p => (
-                                        <div key={p.packageCode} className="p-2 text-center bg-white border border-green-300 rounded text-sm font-mono font-bold text-green-800">
-                                            {p.packageIndex}
-                                        </div>
-                                    ))}
-                                </div>
-                            </div>
-                        </div>
-                    ) : (
-                        <div className="flex-grow flex items-center justify-center p-6 text-center text-slate-500 min-h-[200px]">
-                            <p className="p-4 border border-dashed border-slate-300 rounded text-sm bg-slate-50">
-                                Selecciona una orden de la izquierda para ver su estado de escaneo.
-                            </p>
+                    {selectedOrder && (
+                        <div className="flex-grow overflow-y-auto p-3 space-y-4">
+                            <div className="bg-red-50 p-3 rounded"><h4 className="font-bold text-red-800 text-xs mb-2">PENDIENTES</h4><div className="grid grid-cols-4 gap-2">{pendingPackages.map(p => <div key={p.packageCode} className="p-1 text-center bg-white border border-red-300 rounded text-xs font-bold">{p.packageIndex}</div>)}</div></div>
+                            <div className="bg-green-50 p-3 rounded"><h4 className="font-bold text-green-800 text-xs mb-2">LISTOS</h4><div className="grid grid-cols-4 gap-2">{scannedPackages.map(p => <div key={p.packageCode} className="p-1 text-center bg-white border border-green-300 rounded text-xs font-bold text-green-800">{p.packageIndex}</div>)}</div></div>
                         </div>
                     )}
                 </div>
             );
         };
 
-        // --- APP PRINCIPAL ---
         const App = () => {
             const [orders, setOrders] = useState([]);
             const [selectedOrder, setSelectedOrder] = useState(null); 
             const [packageLabels, setPackageLabels] = useState([]); 
-            const [loading, setLoading] = useState(true);
             const [filterText, setFilterText] = useState('');
-            const [scanTrackerKey, setScanTrackerKey] = useState(0); 
-            const [showScanner, setShowScanner] = useState(false); // Nuevo estado para el modal de escaneo
+            const [showScanner, setShowScanner] = useState(false);
 
+            // --- GENERAR ETIQUETAS DESDE EL PROGRESO REAL ---
+            // Esto es crucial para que coincida con el código único generado
             const generatePackageLabels = (order) => {
-                const totalPieces = order.totalPedido || 0;
-                const packageSizeValue = order.packageSize === 'VARIO' || !order.packageSize ? 50 : (Number(order.packageSize) || 50); 
-                const N = totalPieces > 0 ? Math.ceil(totalPieces / packageSizeValue) : 1; 
-                const labels = [];
-                for (let i = 1; i <= N; i++) {
-                    const piecesInThisPackage = i < N ? packageSizeValue : (totalPieces % packageSizeValue || packageSizeValue);
-                    const packageCode = `${order.codigo}-${order.partida}-${i}`;
-                    labels.push({
-                        ...order, packageIndex: i, totalPackages: N, piecesInPackage: piecesInThisPackage, packageCode: packageCode, displayPackageId: `${i}/${N}`, 
-                    });
+                if (order.progreso && order.progreso.length > 0) {
+                    return order.progreso.map(p => ({
+                        ...order,
+                        piezaNombre: p.piezaNombre, // Para buscar detalles específicos si varían
+                        packageIndex: p.paqueteNum,
+                        totalPackages: p.paquetesDePieza,
+                        piecesInPackage: p.cantidad,
+                        packageCode: p.codigoUnico, // USA EL CÓDIGO ÚNICO REAL
+                        displayPackageId: `${p.paqueteNum}/${p.paquetesDePieza}`
+                    }));
                 }
-                return labels;
+                return [];
             };
 
-            const handleSuccessfulScan = useCallback(() => { 
-                // Forzar la recarga del estado de escaneo de la orden seleccionada
-                setScanTrackerKey(prev => prev + 1); 
-            }, []);
-
             useEffect(() => {
-                const unsubscribe = db.collection('orders')
-                    .where('status', '!=', 'ARCHIVADO')
-                    .onSnapshot(snapshot => {
+                const unsubscribe = db.collection('orders').where('status', '!=', 'ARCHIVADO').onSnapshot(snapshot => {
                         const fetchedOrders = snapshot.docs.map(doc => doc.data());
                         fetchedOrders.sort((a, b) => b.id - a.id);
                         setOrders(fetchedOrders);
-                        setLoading(false);
-                    }, error => {
-                        console.error("Error fetching orders:", error);
-                        setLoading(false);
                     });
                 return () => unsubscribe();
             }, []);
             
             useEffect(() => {
-                if (selectedOrder) { 
-                    setPackageLabels(generatePackageLabels(selectedOrder)); 
-                    setScanTrackerKey(0); 
-                } else { 
-                    setPackageLabels([]); 
-                }
+                if (selectedOrder) { setPackageLabels(generatePackageLabels(selectedOrder)); } else { setPackageLabels([]); }
             }, [selectedOrder]);
 
             const filteredOrders = useMemo(() => {
                 if (!filterText) return orders;
                 const txt = filterText.toUpperCase();
-                return orders.filter(o => (o.codigo && o.codigo.includes(txt)) || (o.cliente && o.cliente.includes(txt)) || (o.partida && o.partida.includes(txt)));
+                return orders.filter(o => (o.codigo && o.codigo.includes(txt)) || (o.cliente && o.cliente.includes(txt)));
             }, [orders, filterText]);
 
             const handlePrint = () => { if(packageLabels.length > 0) window.print(); };
 
-            const handleArchive = async () => {
-                if(!selectedOrder) return;
-                if(window.confirm(`¿Archivar orden ${selectedOrder.codigo}?`)) {
-                    try {
-                        await db.collection('orders').doc(String(selectedOrder.id)).update({
-                            status: 'ARCHIVADO',
-                            printDate: new Date().toISOString()
-                        });
-                        setSelectedOrder(null);
-                    } catch (error) {
-                        window.alert("Error: " + error.message);
-                    }
-                }
-            };
-
             return (
                 <div className="flex flex-col lg:flex-row h-screen w-full">
-                    
-                    {/* COLUMNA 1: BARRA LATERAL */}
-                    <div className="w-full lg:w-96 bg-slate-800 text-white flex flex-col border-r border-slate-700 shadow-xl no-print z-10 shrink-0 h-64 lg:h-auto">
-                        <div className="p-4 border-b border-slate-700 bg-slate-900">
-                            <h1 className="text-xl font-bold flex items-center gap-2 text-yellow-400"><Icon name="printer" /> GENERADOR</h1>
-                            <div className="mt-4 relative">
-                                <input type="text" placeholder="Buscar..." value={filterText} onChange={e => setFilterText(e.target.value)} className="w-full bg-slate-800 border border-slate-600 rounded p-2 pl-8 text-sm focus:border-yellow-400 focus:outline-none" />
-                                <Icon name="search" size={14} className="absolute left-3 top-3 text-slate-500" />
-                            </div>
+                    <div className="w-full lg:w-80 bg-slate-800 text-white flex flex-col border-r border-slate-700 shadow-xl no-print z-10 shrink-0 h-64 lg:h-auto">
+                        <div className="p-4 bg-slate-900 border-b border-slate-700">
+                            <h1 className="text-xl font-bold text-yellow-400">PAPELETAS</h1>
+                            <input type="text" placeholder="Buscar..." value={filterText} onChange={e => setFilterText(e.target.value)} className="w-full mt-2 bg-slate-800 border border-slate-600 rounded p-2 text-sm" />
                         </div>
-
                         <div className="flex-grow overflow-y-auto p-2 space-y-2">
-                            {loading && <div className="flex justify-center p-10"><div className="loader"></div></div>}
                             {filteredOrders.map(order => (
-                                <div key={order.id} onClick={() => setSelectedOrder(order)} className={`p-3 rounded cursor-pointer border-l-4 transition-all hover:bg-slate-700 ${selectedOrder?.id === order.id ? 'bg-slate-700 border-yellow-400 shadow-md' : 'bg-slate-800/50 border-transparent hover:border-slate-500'}`}>
-                                    <div className="flex justify-between items-start mb-1"><span className="font-bold text-lg">{order.codigo}</span><span className="bg-slate-900 text-xs px-2 py-0.5 rounded text-slate-300 font-mono">MQ-{order.maquina}</span></div>
-                                    <div className="text-sm text-slate-300 truncate">{order.cliente}</div>
-                                    <div className="flex justify-between items-end mt-2"><span className="text-xs bg-yellow-900/30 text-yellow-200 px-1 rounded">{order.partida}</span><span className="text-xs font-bold">{order.totalPedido} pzs</span></div>
+                                <div key={order.id} onClick={() => setSelectedOrder(order)} className={`p-3 rounded cursor-pointer border-l-4 transition-all ${selectedOrder?.id === order.id ? 'bg-slate-700 border-yellow-400' : 'bg-slate-800/50 border-transparent'}`}>
+                                    <div className="font-bold">{order.codigo}</div>
+                                    <div className="text-xs text-slate-400">{order.cliente}</div>
                                 </div>
                             ))}
                         </div>
                     </div>
 
-                    {/* COLUMNA 2: ÁREA PRINCIPAL (PAPELETAS) */}
-                    <div className="flex-grow flex-shrink min-w-0 bg-slate-100 flex flex-col relative overflow-auto h-96 lg:h-auto">
+                    <div className="flex-grow bg-slate-100 flex flex-col relative overflow-auto h-96 lg:h-auto">
                         <div className="bg-white p-4 shadow-sm border-b flex justify-between items-center no-print sticky top-0 z-10">
-                            <div>
-                                {selectedOrder ? (
-                                    <h2 className="font-bold text-slate-700 flex items-center gap-2 text-sm lg:text-base">
-                                        {selectedOrder.codigo}
-                                        <span className="text-xs lg:text-sm font-medium text-blue-600 bg-blue-100 px-2 py-1 rounded-full whitespace-nowrap">{packageLabels.length} Etq</span>
-                                    </h2>
-                                ) : ( <h2 className="font-bold text-slate-400">Seleccione orden</h2> )}
-                            </div>
-                            <div className="flex gap-2">
-                                {selectedOrder && ( <>
-                                    <button onClick={handleArchive} className="px-3 py-2 bg-white border border-slate-300 text-slate-600 rounded font-bold hover:bg-red-50 hover:text-red-600 text-xs lg:text-sm">ARCHIVAR</button>
-                                    <button onClick={handlePrint} className="px-3 py-2 bg-slate-900 text-white rounded font-bold hover:bg-slate-700 shadow-lg transition flex items-center gap-2 text-xs lg:text-sm"><Icon name="printer" size={16}/> IMPRIMIR</button>
-                                </> )}
-                            </div>
+                            <h2 className="font-bold text-slate-700">{selectedOrder ? `${selectedOrder.codigo} (${packageLabels.length} Etq)` : 'Seleccione orden'}</h2>
+                            {selectedOrder && <button onClick={handlePrint} className="px-3 py-2 bg-slate-900 text-white rounded font-bold text-sm flex gap-2"><Icon name="printer" size={16}/> IMPRIMIR</button>}
                         </div>
                         <div className="flex-grow flex flex-col items-center p-4 lg:p-10 bg-slate-200 overflow-y-auto print-container">
-                            {packageLabels.length > 0 ? ( packageLabels.map((labelData, index) => ( <div key={index} className="label-wrapper"><ProductionLabel labelData={labelData} /></div> )) ) : ( <div className="text-center text-slate-400 flex flex-col items-center mt-10 lg:mt-20"><Icon name="arrow-left-circle" size={48} className="mb-4 opacity-50"/><p className="text-lg font-bold">Selecciona una orden</p></div> )}
+                            {packageLabels.length > 0 ? ( packageLabels.map((labelData, index) => ( <div key={index} className="label-wrapper"><ProductionLabel labelData={labelData} /></div> )) ) : ( <div className="text-center text-slate-400 mt-20">Selecciona una orden</div> )}
                         </div>
                     </div>
 
-                    {/* COLUMNA 3: TRACKER */}
-                    <ScanTracker 
-                        key={scanTrackerKey} 
-                        selectedOrder={selectedOrder}
-                        packageLabels={packageLabels}
-                        onOpenQuickScan={() => setShowScanner(true)}
-                    />
-
-                    {/* MODAL DE ESCANEO RÁPIDO (NUEVO) */}
-                    <QuickScannerModal
-                        isVisible={showScanner}
-                        onClose={() => setShowScanner(false)}
-                        allOrders={orders} 
-                        onScanSaved={() => {
-                            // Al guardar, forzamos la actualización del ScanTracker (la columna derecha)
-                            handleSuccessfulScan(); 
-                        }}
-                    />
+                    <ScanTracker selectedOrder={selectedOrder} packageLabels={packageLabels} onOpenQuickScan={() => setShowScanner(true)} />
+                    <QuickScannerModal isVisible={showScanner} onClose={() => setShowScanner(false)} allOrders={orders} onScanSaved={() => {}} />
                 </div>
             );
         };
