@@ -31,7 +31,7 @@
         /* ESTILO ORIGINAL DEL CONTENEDOR DE LA ETIQUETA EN PANTALLA */
         .label-wrapper { margin-bottom: 2rem; padding: 1rem; background: white; border-radius: 0.5rem; box-shadow: 0 10px 15px -3px rgba(0, 0, 0, 0.1); page-break-inside: avoid; }
         
-        /* ESTILO TEMPORAL PARA PDF: ELIMINA MARGEN Y SOMBRA */
+        /* ESTILO TEMPORAL PARA PDF: ELIMINA MARGEN Y SOMBRA EN PANTALLA PARA GENERAR EL PDF CORRECTO */
         .pdf-mode .label-wrapper {
             margin-bottom: 0 !important;
             padding: 0 !important;
@@ -59,7 +59,7 @@
             html, body { height: auto !important; overflow: visible !important; background: white !important; margin: 0 !important; padding: 0 !important; }
             .no-print { display: none !important; }
             .print-container { display: block !important; width: 100% !important; height: auto !important; margin: 0 !important; padding: 0 !important; position: static !important; }
-            /* Se asegura que el label-wrapper se ajuste para impresión */
+            /* Asegura que el contenedor de la etiqueta ocupe 6x4in sin padding ni margen */
             .label-wrapper { display: block !important; width: 6in !important; height: 4in !important; margin: 0 !important; padding: 0 !important; border: none !important; box-shadow: none !important; border-radius: 0 !important; break-after: page; page-break-after: always; page-break-inside: avoid; }
             .label-preview-container { border: 2px solid #000 !important; width: 6in !important; height: 4in !important; }
         }
@@ -178,7 +178,8 @@
                         </div>
                         <div style={{display: 'flex', flexDirection: 'column', alignItems: 'flex-end', flexGrow: 1}}>
                             <svg ref={svgRef} style={{maxWidth: '2.5in', width: '2.5in', height: 'auto'}}></svg>
-                            <div className="text-[10px] font-mono text-center w-full mt-1 bg-white px-1 relative z-10">{barcodeValue}</div>
+                            {/* FIX: Se eliminó la clase 'mt-1' del div de abajo para evitar el desborde que generaba la página extra en el PDF. */}
+                            <div className="text-[10px] font-mono text-center w-full bg-white px-1 relative z-10">{barcodeValue}</div>
                         </div>
                     </div>
                 </div>
@@ -284,7 +285,7 @@
                         }
 
                         await db.collection('registro_produccion').doc().set({
-                            codigo_paquete: scannedCode,
+                            codigo_paquete: scannedCode, 
                             orderId: String(foundOrder.id), 
                             fecha: FieldValue.serverTimestamp(),
                             fecha_legible: new Date().toLocaleDateString('es-MX', { day: '2-digit', month: '2-digit', year: 'numeric', hour: '2-digit', minute: '2-digit' }).replace(/\//g, '/'), 
@@ -292,7 +293,7 @@
                             tipo: "produccion",
                             modelo: foundOrder.codigo,
                             partida: foundOrder.partida,
-                            paquete_indice: foundPackage.paqueteNum,
+                            paquete_indice: foundPackage.paqueteNum, 
                             paquete_total: foundPackage.paquetesDePieza,
                             piezas_en_paquete: foundPackage.cantidad
                         });
@@ -397,17 +398,17 @@
             const [packageLabels, setPackageLabels] = useState([]); 
             const [filterText, setFilterText] = useState('');
             const [showScanner, setShowScanner] = useState(false);
-            const [isGeneratingPdf, setIsGeneratingPdf] = useState(false); // Nuevo estado de carga para el PDF
+            const [isGeneratingPdf, setIsGeneratingPdf] = useState(false); // Estado de carga para el PDF
 
             const generatePackageLabels = (order) => {
                 if (order.progreso && order.progreso.length > 0) {
                     return order.progreso.map(p => ({
                         ...order,
-                        piezaNombre: p.piezaNombre,
+                        piezaNombre: p.piezaNombre, 
                         packageIndex: p.paqueteNum,
                         totalPackages: p.paquetesDePieza,
                         piecesInPackage: p.cantidad,
-                        packageCode: p.codigoUnico,
+                        packageCode: p.codigoUnico, 
                         displayPackageId: `${p.paqueteNum}/${p.paquetesDePieza}`
                     }));
                 }
@@ -435,27 +436,28 @@
 
             const handlePrint = () => { if(packageLabels.length > 0) window.print(); };
 
-            // === FUNCIÓN NUEVA PARA DESCARGAR PDF ===
+            // === FUNCIÓN PARA DESCARGAR PDF (FIXEADA) ===
             const handleDownloadPDF = () => {
                 if (packageLabels.length === 0) return;
                 setIsGeneratingPdf(true);
                 
-                // Seleccionamos el contenedor que tiene todas las etiquetas
+                // 1. Seleccionamos el contenedor que tiene todas las etiquetas
                 const element = document.querySelector('.print-container');
                 
-                // Opciones especificas para 6x4 pulgadas
+                // 2. Opciones especificas para 6x4 pulgadas
                 const opt = {
                     margin:       0,
                     filename:     `${selectedOrder.codigo || 'orden'}_${packageLabels.length}pqts.pdf`,
                     image:        { type: 'jpeg', quality: 0.98 },
-                    html2canvas:  { scale: 2, useCORS: true, logging: false, backgroundColor: '#ffffff' }, // Fondo blanco forzado
-                    jsPDF:        { unit: 'in', format: [6, 4], orientation: 'landscape' }
+                    html2canvas:  { scale: 2, useCORS: true, logging: false, backgroundColor: '#ffffff' }, 
+                    jsPDF:        { unit: 'in', format: [6, 4], orientation: 'landscape' } // Dimensiones exactas
                 };
 
-                // Añadir clase temporal para quitar sombras y margenes durante la generación
+                // 3. Añadir clase temporal para que html2pdf ignore los margenes/sombras de la vista de pantalla
                 element.classList.add('pdf-mode');
 
                 html2pdf().set(opt).from(element).save().then(() => {
+                    // 4. Limpieza
                     element.classList.remove('pdf-mode');
                     setIsGeneratingPdf(false);
                 }).catch(err => {
