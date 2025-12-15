@@ -3,7 +3,7 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>Generador Cirineo v4.4 (Barcode Max Size + Image Centering Fix)</title>
+    <title>Generador Cirineo v5.0 (Multi-Fuente + Firebase)</title>
     
     <link rel="icon" href="https://raw.githubusercontent.com/jesusvn1993mplvt3-ai/CIRINEO/refs/heads/main/icon.ico">
     
@@ -28,7 +28,7 @@
         
         #reader a, #reader-hidden a { display: none !important; }
 
-        /* --- PDF FIXED CONTAINER --- */
+        /* --- CLASES CRÍTICAS PARA EL PDF --- */
         .pdf-fixed-container {
             width: 6in;
             height: 4in;
@@ -44,56 +44,30 @@
 
         .preview-wrapper {
             width: 100%;
-            max-width: 600px;
+            max-width: 600px; 
             aspect-ratio: 6/4;
             margin-bottom: 2rem;
             box-shadow: 0 4px 6px -1px rgba(0, 0, 0, 0.1);
             background: white;
         }
 
-        /* --- LABEL LAYOUT --- */
+        /* --- ESTRUCTURA DE LA ETIQUETA --- */
         .label-layout {
             width: 100%;
             height: 100%;
             display: flex;
             border: 1px solid #ddd;
-            padding: 0.25in; 
+            padding: 0.25in;
             box-sizing: border-box;
             background: white;
         }
 
-        .col-img {
-            width: 25%;
-            display: flex;
-            align-items: center; /* Centrado vertical */
-            justify-content: center; /* Centrado horizontal */
-            border-right: 2px solid #000;
-            padding-right: 5px;
-            overflow: hidden;
-        }
-        
-        /* FIX: Asegura que la imagen no se estire y se centre */
-        .col-img img {
-            max-width: 100%; /* Limita el ancho al contenedor */
-            max-height: 100%; /* Limita la altura al contenedor */
-            object-fit: contain; /* Preserva la relación de aspecto sin estirar */
-        }
+        .col-img { width: 25%; display: flex; align-items: center; justify-content: center; border-right: 2px solid #000; padding-right: 5px; overflow: hidden; }
+        .col-img img { width: 100%; height: 100%; object-fit: contain; }
 
-        .col-data {
-            width: 60%;
-            display: flex;
-            flex-direction: column;
-            border-right: 2px solid #000;
-        }
+        .col-data { width: 60%; display: flex; flex-direction: column; border-right: 2px solid #000; }
 
-        .col-barcode {
-            width: 60%;
-            display: flex;
-            align-items: center;
-            justify-content: center;
-            overflow: hidden;
-            position: relative;
-        }
+        .col-barcode { width: 15%; display: flex; align-items: center; justify-content: center; overflow: hidden; position: relative; }
 
         .lbl-row { display: flex; border-bottom: 2px solid #000; width: 100%; }
         .lbl-row:last-child { border-bottom: none; }
@@ -139,84 +113,119 @@
             return <div ref={containerRef} className="inline-block" style={{ width: size, height: size }}></div>;
         };
 
-        // --- GESTOR DE REPOSITORIOS (DB) ---
-        const RepoManagerModal = ({ isVisible, onClose }) => {
-            const [repos, setRepos] = useState([]);
+        // --- NUEVO MODAL DE GESTIÓN DE FUENTES DE IMÁGENES (DB) ---
+        const ImageConfigModal = ({ isVisible, onClose }) => {
+            const [sources, setSources] = useState([]);
+            const [newName, setNewName] = useState('');
             const [newUrl, setNewUrl] = useState('');
             const [loading, setLoading] = useState(false);
 
+            // Cargar configuración desde Firebase al abrir
             useEffect(() => {
-                if(!isVisible) return;
-                const unsub = db.collection('config_repos').orderBy('createdAt', 'desc').onSnapshot(snap => {
-                    setRepos(snap.docs.map(d => ({id: d.id, ...d.data()})));
-                });
-                return () => unsub();
+                if(isVisible) {
+                    const unsubscribe = db.collection('app_config').doc('imagenes')
+                        .onSnapshot(doc => {
+                            if(doc.exists && doc.data().sources) {
+                                setSources(doc.data().sources);
+                            } else {
+                                setSources([]);
+                            }
+                        });
+                    return () => unsubscribe();
+                }
             }, [isVisible]);
 
-            const addRepo = async () => {
-                if(!newUrl.trim()) return;
-                setLoading(true);
+            const handleAdd = async () => {
+                if(!newName || !newUrl) return alert("Llena ambos campos");
+                
+                // Limpiar URL (quitar slash final)
                 let cleanUrl = newUrl.trim();
                 if(cleanUrl.endsWith('/')) cleanUrl = cleanUrl.slice(0, -1);
 
+                const newEntry = { id: Date.now(), name: newName, url: cleanUrl };
+                const updatedSources = [...sources, newEntry];
+
+                setLoading(true);
                 try {
-                    await db.collection('config_repos').add({
-                        url: cleanUrl,
-                        createdAt: FieldValue.serverTimestamp()
-                    });
+                    await db.collection('app_config').doc('imagenes').set({ sources: updatedSources }, { merge: true });
+                    setNewName('');
                     setNewUrl('');
-                } catch(e) { alert("Error al guardar: " + e.message); }
+                } catch(e) {
+                    alert("Error al guardar: " + e.message);
+                }
                 setLoading(false);
             };
 
-            const deleteRepo = async (id) => {
-                if(confirm("¿Eliminar este repositorio?")) {
-                    await db.collection('config_repos').doc(id).delete();
-                }
+            const handleDelete = async (idToDelete) => {
+                if(!confirm("¿Eliminar esta fuente?")) return;
+                const updatedSources = sources.filter(s => s.id !== idToDelete);
+                try {
+                    await db.collection('app_config').doc('imagenes').set({ sources: updatedSources });
+                } catch(e) { alert("Error: " + e.message); }
             };
 
             if(!isVisible) return null;
 
             return (
                 <div className="fixed inset-0 bg-black/80 z-[100] flex items-center justify-center p-4">
-                    <div className="bg-white rounded-lg shadow-xl w-full max-w-md overflow-hidden flex flex-col max-h-[80vh]">
-                        <div className="bg-slate-800 text-white p-3 font-bold flex justify-between items-center shrink-0">
-                            <span>FUENTES DE IMÁGENES</span>
+                    <div className="bg-white rounded-lg shadow-xl w-full max-w-lg overflow-hidden flex flex-col max-h-[90vh]">
+                        <div className="bg-slate-800 text-white p-3 font-bold flex justify-between items-center">
+                            <span className="flex items-center gap-2"><Icon name="images"/> FUENTES DE IMÁGENES</span>
                             <button onClick={onClose}><Icon name="x"/></button>
                         </div>
-                        <div className="p-4 flex-grow overflow-y-auto">
-                            <div className="flex gap-2 mb-4">
+                        
+                        <div className="p-4 bg-blue-50 border-b border-blue-100 text-xs text-blue-800">
+                            <p>Agrega repositorios de GitHub, servidores locales (http://192.168...) o carpetas públicas.</p>
+                            <p className="mt-1 font-bold">El sistema buscará la imagen en orden descendente hasta encontrar una.</p>
+                        </div>
+
+                        <div className="p-4 flex flex-col gap-2 border-b">
+                            <div className="flex gap-2">
                                 <input 
-                                    type="text" 
-                                    value={newUrl} 
-                                    onChange={e => setNewUrl(e.target.value)}
-                                    placeholder="Pegar URL del repositorio..."
-                                    className="flex-grow border border-slate-300 rounded p-2 text-sm"
+                                    className="border p-2 rounded text-sm w-1/3" 
+                                    placeholder="Nombre (ej. GitHub)" 
+                                    value={newName} onChange={e => setNewName(e.target.value)}
                                 />
-                                <button onClick={addRepo} disabled={loading} className="bg-blue-600 text-white px-3 rounded font-bold hover:bg-blue-700">+</button>
+                                <input 
+                                    className="border p-2 rounded text-sm w-2/3" 
+                                    placeholder="URL Base (ej. https://.../img)" 
+                                    value={newUrl} onChange={e => setNewUrl(e.target.value)}
+                                />
                             </div>
+                            <button 
+                                onClick={handleAdd} 
+                                disabled={loading}
+                                className="bg-green-600 hover:bg-green-700 text-white font-bold py-2 rounded text-sm flex justify-center items-center gap-2"
+                            >
+                                {loading ? 'GUARDANDO...' : <><Icon name="plus" size={16}/> AGREGAR FUENTE</>}
+                            </button>
+                        </div>
+
+                        <div className="flex-grow overflow-y-auto p-4 space-y-2 bg-slate-50">
+                            {sources.length === 0 && <p className="text-center text-gray-400 text-sm">No hay fuentes configuradas.</p>}
                             
-                            <h4 className="text-xs font-bold text-slate-500 mb-2 uppercase">Repositorios Activos:</h4>
-                            {repos.length === 0 && <p className="text-sm text-slate-400 italic">No hay repositorios configurados.</p>}
-                            <ul className="space-y-2">
-                                {repos.map(repo => (
-                                    <li key={repo.id} className="bg-slate-50 p-2 rounded border flex justify-between items-center text-xs">
-                                        <span className="truncate max-w-[85%] font-mono text-slate-600" title={repo.url}>{repo.url}</span>
-                                        <button onClick={() => deleteRepo(repo.id)} className="text-red-500 hover:text-red-700 font-bold">X</button>
-                                    </li>
-                                ))}
-                            </ul>
-                            <div className="mt-4 text-[10px] text-slate-400 bg-yellow-50 p-2 rounded border border-yellow-200">
-                                <p><strong>Nota:</strong> El sistema buscará la imagen en el primer repositorio. Si no la encuentra, intentará en el segundo, y así sucesivamente.</p>
-                            </div>
+                            {sources.map((source, index) => (
+                                <div key={source.id} className="bg-white border rounded p-3 flex justify-between items-center shadow-sm">
+                                    <div className="overflow-hidden">
+                                        <div className="font-bold text-sm flex items-center gap-2">
+                                            <span className="bg-slate-200 text-slate-600 px-1.5 rounded text-[10px]">{index + 1}</span>
+                                            {source.name}
+                                        </div>
+                                        <div className="text-xs text-slate-500 truncate mt-1" title={source.url}>{source.url}</div>
+                                    </div>
+                                    <button onClick={() => handleDelete(source.id)} className="text-red-500 hover:text-red-700 p-2">
+                                        <Icon name="trash-2" size={18}/>
+                                    </button>
+                                </div>
+                            ))}
                         </div>
                     </div>
                 </div>
             );
         };
 
-        // --- ETIQUETA ---
-        const ProductionLabel = ({ labelData, shiftHours, repos }) => {
+        // --- COMPONENTE DE ETIQUETA (ACTUALIZADO PARA MULTI-FUENTE) ---
+        const ProductionLabel = ({ labelData, shiftHours, imageSources }) => {
             const svgRef = useRef(null);
             const order = labelData; 
             const subPiece = order.subPiecesData ? order.subPiecesData.find(sp => sp.pieza === order.piezaNombre) : (order.subPiecesData?.[0] || {});
@@ -230,55 +239,50 @@
             const pzas1hr = tiempo > 0 ? (60 / tiempo).toFixed(1) : '-'; 
             const pzasShift = tiempo > 0 ? ((hours * 60) / tiempo).toFixed(1) : '-'; 
 
-            // --- LOGICA DE IMAGEN EN CASCADA ---
+            // Gestión de Imagen Inteligente (Cascada)
             const [imgSrc, setImgSrc] = useState(null);
-            const [currentRepoIndex, setCurrentRepoIndex] = useState(0);
-            const [tryPng, setTryPng] = useState(false); // false = jpg, true = png
+            const [currentSourceIdx, setCurrentSourceIdx] = useState(0);
+            const [tryPng, setTryPng] = useState(false); // Primero intenta JPG, si falla intenta PNG en la misma fuente
 
-            // Reiniciar busqueda cuando cambia el codigo o la lista de repos
+            // Resetear cuando cambia el código del modelo
             useEffect(() => {
-                setImgSrc(null);
-                setCurrentRepoIndex(0);
-                setTryPng(false);
-                if (repos && repos.length > 0 && order.codigo) {
-                   attemptLoad(0, false);
+                if(imageSources && imageSources.length > 0 && order.codigo) {
+                    setCurrentSourceIdx(0);
+                    setTryPng(false);
+                    setImgSrc(`${imageSources[0].url}/${order.codigo}.jpg`);
+                } else {
+                    setImgSrc(null);
                 }
-            }, [order.codigo, repos]);
-
-            const attemptLoad = (repoIdx, isPng) => {
-                if (repoIdx >= repos.length) return; 
-                const ext = isPng ? '.png' : '.jpg';
-                const url = `${repos[repoIdx].url}/${order.codigo}${ext}`;
-                setImgSrc(url);
-            };
+            }, [order.codigo, imageSources]);
 
             const handleImgError = () => {
+                // Paso 1: Si falló JPG, intentar PNG en la misma fuente
                 if (!tryPng) {
                     setTryPng(true);
-                    attemptLoad(currentRepoIndex, true);
-                } else {
-                    const nextRepo = currentRepoIndex + 1;
-                    if (nextRepo < repos.length) {
-                        setCurrentRepoIndex(nextRepo);
-                        setTryPng(false);
-                        attemptLoad(nextRepo, false);
-                    } else {
-                        setImgSrc(null); 
+                    if(imageSources[currentSourceIdx]) {
+                        setImgSrc(`${imageSources[currentSourceIdx].url}/${order.codigo}.png`);
                     }
+                    return;
+                }
+
+                // Paso 2: Si falló PNG, pasar a la siguiente fuente
+                const nextIdx = currentSourceIdx + 1;
+                if (nextIdx < imageSources.length) {
+                    setCurrentSourceIdx(nextIdx);
+                    setTryPng(false); // Reiniciar a buscar JPG en la nueva fuente
+                    setImgSrc(`${imageSources[nextIdx].url}/${order.codigo}.jpg`);
+                } else {
+                    // Se acabaron las fuentes
+                    setImgSrc(null); 
                 }
             };
 
-            // --- BARCODE ---
+            // Barcode
             useEffect(() => {
                 if (svgRef.current && barcodeValue) {
                     try {
                         JsBarcode(svgRef.current, barcodeValue, { 
-                            format: "CODE128", 
-                            lineColor: "#000", 
-                            width: 5,   // <--- AUMENTADO (ANTES 3)
-                            height: 200, // <--- AUMENTADO (ANTES 120)
-                            displayValue: false, 
-                            margin: 0 
+                            format: "CODE128", lineColor: "#000", width: 1.6, height: 55, displayValue: false, margin: 3
                         });
                     } catch (e) { console.error("Error barcode", e); }
                 }
@@ -286,16 +290,25 @@
 
             return (
                 <div className="label-layout">
-                    {/* ZONA 1: IMAGEN */}
+                    {/* ZONA 1: IMAGEN (IZQUIERDA) */}
                     <div className="col-img">
                         {imgSrc ? (
-                            <img src={imgSrc} onError={handleImgError} alt={order.codigo} />
+                            <img 
+                                src={imgSrc} 
+                                onError={handleImgError} 
+                                alt={order.codigo}
+                            />
                         ) : (
-                            <div className="text-slate-300 text-xs text-center font-bold">SIN<br/>IMAGEN</div>
+                            <div className="flex flex-col items-center justify-center h-full">
+                                <div className="text-slate-300 text-xs text-center font-bold">SIN<br/>IMAGEN</div>
+                                <div className="text-[8px] text-slate-200 text-center mt-1">
+                                    {imageSources?.length > 0 ? 'No encontrada' : 'Sin fuentes'}
+                                </div>
+                            </div>
                         )}
                     </div>
 
-                    {/* ZONA 2: DATOS */}
+                    {/* ZONA 2: DATOS (CENTRO) */}
                     <div className="col-data">
                         <div className="lbl-row" style={{height: '18%'}}>
                             <div className="lbl-col" style={{width: '65%'}}>
@@ -366,18 +379,19 @@
                         </div>
                     </div>
 
-                    {/* ZONA 3: BARCODE (MÁXIMO TAMAÑO) */}
+                    {/* ZONA 3: BARCODE */}
                     <div className="col-barcode">
                         <div style={{
                             transform: 'rotate(90deg)', 
                             transformOrigin: 'center', 
                             width: '3.5in', 
                             display: 'flex',
+                            flexDirection: 'column',
                             alignItems: 'center',
-                            justifyContent: 'center',
-                            overflow: 'hidden' 
+                            justifyContent: 'center'
                         }}>
-                             <svg ref={svgRef} style={{maxWidth: '100%', maxHeight: '100%'}}></svg>
+                             <svg ref={svgRef} style={{width: '100%', height: 'auto'}}></svg>
+                             <div style={{fontSize: '10px', fontFamily: 'monospace', marginTop: '5px'}}>{barcodeValue}</div>
                         </div>
                     </div>
                 </div>
@@ -423,22 +437,27 @@
             const handleQuickScan = (rawCode) => {
                 if (!rawCode) return;
                 const scannedCode = rawCode.trim();
+
                 if (scans.includes(scannedCode)) {
                     setScanStatus({ message: `Código ${scannedCode} ya escaneado.`, type: 'warning' });
                     return;
                 }
+
                 let foundPackage = null;
                 let foundOrder = null;
+
                 for (const order of allOrders) {
                     if (order.progreso) {
                         const pkg = order.progreso.find(p => p.codigoUnico === scannedCode);
                         if (pkg) { foundPackage = pkg; foundOrder = order; break; }
                     }
                 }
+
                 if (!foundPackage || !foundOrder) {
                     setScanStatus({ message: `Código ${scannedCode} NO encontrado.`, type: 'error' });
                     return;
                 }
+
                 setScans(prev => [...prev, scannedCode]);
                 setScanStatus({ message: `¡OK! ${foundPackage.piezaNombre} (${foundPackage.paqueteNum})`, type: 'success' });
             };
@@ -446,6 +465,7 @@
             const handleSaveAll = async () => {
                 if (scans.length === 0 || isSaving) return;
                 setIsSaving(true);
+                const successfulScans = [];
                 const failedScans = [];
 
                 for (const scannedCode of scans) {
@@ -476,6 +496,7 @@
                             paquete_total: foundPackage.paquetesDePieza,
                             piezas_en_paquete: foundPackage.cantidad
                         });
+                        successfulScans.push(scannedCode);
                     } catch (error) { failedScans.push(scannedCode); }
                 }
                 setIsSaving(false);
@@ -518,28 +539,33 @@
             const [packageLabels, setPackageLabels] = useState([]); 
             const [filterText, setFilterText] = useState('');
             const [showScanner, setShowScanner] = useState(false);
-            const [showRepoModal, setShowRepoModal] = useState(false);
+            const [showConfigModal, setShowConfigModal] = useState(false);
             const [isGeneratingPdf, setIsGeneratingPdf] = useState(false); 
             const [shiftHours, setShiftHours] = useState(12);
             
-            // Repositorios desde DB
-            const [repos, setRepos] = useState([]);
+            // Estado para las fuentes de imágenes cargadas de Firebase
+            const [imageSources, setImageSources] = useState([]);
 
             const pdfContainerRef = useRef(null);
 
+            // Cargar fuentes de imágenes
             useEffect(() => {
-                // Cargar repositorios al iniciar
-                const unsubRepos = db.collection('config_repos').orderBy('createdAt', 'desc').onSnapshot(snap => {
-                    const loaded = snap.docs.map(d => ({id: d.id, ...d.data()}));
-                    setRepos(loaded);
-                });
+                const unsubscribe = db.collection('app_config').doc('imagenes')
+                    .onSnapshot(doc => {
+                        if(doc.exists && doc.data().sources) {
+                            setImageSources(doc.data().sources);
+                        }
+                    });
+                return () => unsubscribe();
+            }, []);
 
-                const unsubOrders = db.collection('orders').where('status', '!=', 'ARCHIVADO').onSnapshot(snapshot => {
-                    const fetchedOrders = snapshot.docs.map(doc => doc.data());
-                    fetchedOrders.sort((a, b) => b.id - a.id);
-                    setOrders(fetchedOrders);
-                });
-                return () => { unsubRepos(); unsubOrders(); };
+            useEffect(() => {
+                const unsubscribe = db.collection('orders').where('status', '!=', 'ARCHIVADO').onSnapshot(snapshot => {
+                        const fetchedOrders = snapshot.docs.map(doc => doc.data());
+                        fetchedOrders.sort((a, b) => b.id - a.id);
+                        setOrders(fetchedOrders);
+                    });
+                return () => unsubscribe();
             }, []);
             
             useEffect(() => {
@@ -566,26 +592,30 @@
             const handleDownloadPDF = async () => {
                 if (packageLabels.length === 0) return;
                 setIsGeneratingPdf(true);
+
                 await new Promise(resolve => setTimeout(resolve, 500));
                 
                 const element = pdfContainerRef.current;
                 if(!element) {
-                    alert("Error interno PDF");
+                    alert("Error interno: Contenedor PDF no encontrado.");
                     setIsGeneratingPdf(false);
                     return;
                 }
 
                 const opt = {
-                    margin: [0, 0],
-                    filename: `${selectedOrder.codigo || 'orden'}_${packageLabels.length}pqts.pdf`,
-                    image: { type: 'jpeg', quality: 1.0 },
-                    html2canvas: { scale: 2, useCORS: true, logging: false, windowWidth: 1200 },
-                    jsPDF: { unit: 'in', format: [6, 4], orientation: 'landscape' }
+                    margin:       [0, 0], 
+                    filename:     `${selectedOrder.codigo || 'orden'}_${packageLabels.length}pqts.pdf`,
+                    image:        { type: 'jpeg', quality: 1.0 },
+                    html2canvas:  { scale: 2, useCORS: true, logging: false, windowWidth: 1200 },
+                    jsPDF:        { unit: 'in', format: [6, 4], orientation: 'landscape' }
                 };
 
-                html2pdf().set(opt).from(element).save().then(() => setIsGeneratingPdf(false)).catch(err => {
-                    console.error(err);
+                html2pdf().set(opt).from(element).save().then(() => {
                     setIsGeneratingPdf(false);
+                }).catch(err => {
+                    console.error("PDF Error:", err);
+                    setIsGeneratingPdf(false);
+                    alert("Error al generar PDF.");
                 });
             };
 
@@ -594,7 +624,7 @@
                     {/* SIDEBAR */}
                     <div className="w-full lg:w-72 bg-slate-800 text-white flex flex-col border-r border-slate-700 shadow-xl shrink-0 h-64 lg:h-auto">
                         <div className="p-4 bg-slate-900 border-b border-slate-700">
-                            <h1 className="text-xl font-bold text-yellow-400 tracking-tighter">CIRINEO v4.4</h1>
+                            <h1 className="text-xl font-bold text-yellow-400 tracking-tighter">CIRINEO v5.0</h1>
                             <input type="text" placeholder="Buscar orden..." value={filterText} onChange={e => setFilterText(e.target.value)} className="w-full mt-2 bg-slate-800 border border-slate-600 rounded p-2 text-sm" />
                             
                             <div className="mt-4 grid grid-cols-2 gap-2">
@@ -604,8 +634,8 @@
                                 </div>
                                 <div>
                                     <label className="text-[10px] text-slate-400">CONFIG</label>
-                                    <button onClick={() => setShowRepoModal(true)} className="w-full bg-slate-700 hover:bg-slate-600 border border-slate-500 rounded p-1 text-xs font-bold flex justify-center items-center gap-1">
-                                        <Icon name="image" size={12}/> IMÁGENES
+                                    <button onClick={() => setShowConfigModal(true)} className="w-full bg-slate-700 hover:bg-slate-600 border border-slate-500 rounded p-1 text-xs font-bold flex justify-center items-center gap-1">
+                                        <Icon name="settings" size={12}/> IMÁGENES
                                     </button>
                                 </div>
                             </div>
@@ -622,6 +652,7 @@
 
                     {/* MAIN CONTENT */}
                     <div className="flex-grow bg-slate-100 flex flex-col relative overflow-hidden">
+                        {/* Header */}
                         <div className="bg-white p-3 shadow-sm border-b flex justify-between items-center z-10">
                             <h2 className="font-bold text-slate-700 text-lg truncate">
                                 {selectedOrder ? `${selectedOrder.codigo} - ${packageLabels.length} PAQUETES` : 'Seleccione una orden'}
@@ -633,16 +664,17 @@
                             )}
                         </div>
 
-                        {/* PREVIEW */}
+                        {/* Vista Previa */}
                         <div className="flex-grow overflow-y-auto p-4 lg:p-8 flex flex-col items-center">
                             {packageLabels.length > 0 ? (
                                 <>
                                     <div className="text-xs font-bold text-slate-400 mb-2 uppercase tracking-wide">VISTA PREVIA (1 de {packageLabels.length})</div>
                                     <div className="preview-wrapper">
-                                        <ProductionLabel labelData={packageLabels[0]} shiftHours={shiftHours} repos={repos} />
+                                        <ProductionLabel labelData={packageLabels[0]} shiftHours={shiftHours} imageSources={imageSources} />
                                     </div>
                                     <div className="text-center text-slate-500 text-sm max-w-md">
-                                        El código de barras se ha maximizado (Ancho: 5, Alto: 200) y la imagen está centrada y sin estiramiento.
+                                        Esta es una vista previa. Al descargar PDF se generarán todas las etiquetas.
+                                        {imageSources.length > 0 && <div className="text-xs text-blue-500 mt-1">Fuentes de imágenes activas: {imageSources.length}</div>}
                                     </div>
                                 </>
                             ) : (
@@ -654,12 +686,12 @@
                         </div>
                     </div>
 
-                    {/* PDF GENERATION CONTAINER (HIDDEN) */}
+                    {/* CONTENEDOR OCULTO PARA PDF */}
                     <div style={{position: 'absolute', top: 0, left: '-9999px', width: '6in'}}>
                         <div ref={pdfContainerRef}>
                             {packageLabels.map((labelData, index) => (
                                 <div key={index} className="pdf-fixed-container">
-                                    <ProductionLabel labelData={labelData} shiftHours={shiftHours} repos={repos} />
+                                    <ProductionLabel labelData={labelData} shiftHours={shiftHours} imageSources={imageSources} />
                                 </div>
                             ))}
                         </div>
@@ -674,10 +706,11 @@
                             <button onClick={() => setShowScanner(true)} className="w-full bg-blue-600 hover:bg-blue-700 text-white py-3 rounded-lg font-bold shadow-md flex flex-col items-center gap-2">
                                 <Icon name="camera" size={24}/> ABRIR ESCÁNER
                             </button>
+                            <p className="text-xs text-center text-slate-400 mt-4">Escanea códigos para validar producción.</p>
                          </div>
                     </div>
 
-                    <RepoManagerModal isVisible={showRepoModal} onClose={() => setShowRepoModal(false)} />
+                    <ImageConfigModal isVisible={showConfigModal} onClose={() => setShowConfigModal(false)} />
                     <QuickScannerModal isVisible={showScanner} onClose={() => setShowScanner(false)} allOrders={orders} onScanSaved={() => {}} />
                 </div>
             );
