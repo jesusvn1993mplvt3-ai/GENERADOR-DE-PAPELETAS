@@ -3,7 +3,7 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>Generador Cirineo v4.2 (Barcode X2)</title>
+    <title>Generador Cirineo v4.4 (Barcode Max Size + Image Centering Fix)</title>
     
     <link rel="icon" href="https://raw.githubusercontent.com/jesusvn1993mplvt3-ai/CIRINEO/refs/heads/main/icon.ico">
     
@@ -65,16 +65,18 @@
         .col-img {
             width: 25%;
             display: flex;
-            align-items: center;
-            justify-content: center;
+            align-items: center; /* Centrado vertical */
+            justify-content: center; /* Centrado horizontal */
             border-right: 2px solid #000;
             padding-right: 5px;
             overflow: hidden;
         }
+        
+        /* FIX: Asegura que la imagen no se estire y se centre */
         .col-img img {
-            width: 100%;
-            height: 100%;
-            object-fit: contain;
+            max-width: 100%; /* Limita el ancho al contenedor */
+            max-height: 100%; /* Limita la altura al contenedor */
+            object-fit: contain; /* Preserva la relación de aspecto sin estirar */
         }
 
         .col-data {
@@ -244,7 +246,7 @@
             }, [order.codigo, repos]);
 
             const attemptLoad = (repoIdx, isPng) => {
-                if (repoIdx >= repos.length) return; // Se acabaron los repos
+                if (repoIdx >= repos.length) return; 
                 const ext = isPng ? '.png' : '.jpg';
                 const url = `${repos[repoIdx].url}/${order.codigo}${ext}`;
                 setImgSrc(url);
@@ -273,8 +275,8 @@
                         JsBarcode(svgRef.current, barcodeValue, { 
                             format: "CODE128", 
                             lineColor: "#000", 
-                            width: 3,   // <--- ANTES 1.6, AHORA 3 (MÁS GRUESO)
-                            height: 120, // <--- ANTES 60, AHORA 120 (MÁS ALTO)
+                            width: 5,   // <--- AUMENTADO (ANTES 3)
+                            height: 200, // <--- AUMENTADO (ANTES 120)
                             displayValue: false, 
                             margin: 0 
                         });
@@ -364,7 +366,7 @@
                         </div>
                     </div>
 
-                    {/* ZONA 3: BARCODE (DOBLE TAMAÑO) */}
+                    {/* ZONA 3: BARCODE (MÁXIMO TAMAÑO) */}
                     <div className="col-barcode">
                         <div style={{
                             transform: 'rotate(90deg)', 
@@ -592,7 +594,7 @@
                     {/* SIDEBAR */}
                     <div className="w-full lg:w-72 bg-slate-800 text-white flex flex-col border-r border-slate-700 shadow-xl shrink-0 h-64 lg:h-auto">
                         <div className="p-4 bg-slate-900 border-b border-slate-700">
-                            <h1 className="text-xl font-bold text-yellow-400 tracking-tighter">CIRINEO v4.2</h1>
+                            <h1 className="text-xl font-bold text-yellow-400 tracking-tighter">CIRINEO v4.4</h1>
                             <input type="text" placeholder="Buscar orden..." value={filterText} onChange={e => setFilterText(e.target.value)} className="w-full mt-2 bg-slate-800 border border-slate-600 rounded p-2 text-sm" />
                             
                             <div className="mt-4 grid grid-cols-2 gap-2">
@@ -637,11 +639,10 @@
                                 <>
                                     <div className="text-xs font-bold text-slate-400 mb-2 uppercase tracking-wide">VISTA PREVIA (1 de {packageLabels.length})</div>
                                     <div className="preview-wrapper">
-                                        {/* Pasamos 'repos' a la etiqueta para que busque la imagen */}
                                         <ProductionLabel labelData={packageLabels[0]} shiftHours={shiftHours} repos={repos} />
                                     </div>
                                     <div className="text-center text-slate-500 text-sm max-w-md">
-                                        Nota: El código de barras se ha agrandado al doble (ancho 3, alto 120) para mayor legibilidad.
+                                        El código de barras se ha maximizado (Ancho: 5, Alto: 200) y la imagen está centrada y sin estiramiento.
                                     </div>
                                 </>
                             ) : (
