@@ -3,7 +3,7 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>Generador de Papeletas - Cirineo v3.4</title>
+    <title>Generador de Papeletas - Cirineo v3.5 (PDF Fix)</title>
     
     <link rel="icon" href="https://raw.githubusercontent.com/jesusvn1993mplvt3-ai/CIRINEO/refs/heads/main/icon.ico">
     
@@ -31,14 +31,43 @@
         /* ESTILO ORIGINAL DEL CONTENEDOR DE LA ETIQUETA EN PANTALLA */
         .label-wrapper { margin-bottom: 2rem; padding: 1rem; background: white; border-radius: 0.5rem; box-shadow: 0 10px 15px -3px rgba(0, 0, 0, 0.1); page-break-inside: avoid; }
         
-        /* ESTILO TEMPORAL PARA PDF: ELIMINA MARGEN Y SOMBRA EN PANTALLA PARA GENERAR EL PDF CORRECTO */
+        /* ==========================================================================
+           CORRECCIÓN CRÍTICA PARA EL PDF
+           ========================================================================== */
+        
+        /* 1. Resetear el contenedor principal al generar PDF: Fondo blanco, sin padding, sin flex */
+        .pdf-mode.print-container {
+            background-color: #ffffff !important;
+            padding: 0 !important;
+            margin: 0 !important;
+            display: block !important; /* Importante: Quita el Flexbox para evitar huecos */
+            width: 6in !important;
+            height: auto !important;
+            overflow: visible !important;
+        }
+
+        /* 2. Resetear el wrapper de la etiqueta: Sin márgenes, tamaño exacto */
         .pdf-mode .label-wrapper {
-            margin-bottom: 0 !important;
+            margin: 0 !important;
             padding: 0 !important;
             box-shadow: none !important;
+            border: none !important;
+            border-radius: 0 !important;
+            width: 6in !important;
+            height: 4in !important;
             break-after: page; 
             page-break-after: always;
+            position: relative;
         }
+
+        /* 3. IMPORTANTE: Evitar que la última etiqueta genere una página en blanco extra */
+        .pdf-mode .label-wrapper:last-child {
+            break-after: auto !important;
+            page-break-after: auto !important;
+            margin-bottom: 0 !important;
+        }
+
+        /* ========================================================================== */
 
         .label-preview-container { width: 6in; height: 4in; background-color: white; position: relative; box-sizing: border-box; border: 2px solid #000; display: flex; flex-direction: column; overflow: hidden; }
         .lbl-row { display: flex; border-bottom: 2px solid #000; width: 100%; }
@@ -58,9 +87,10 @@
             @page { size: 6in 4in; margin: 0mm; }
             html, body { height: auto !important; overflow: visible !important; background: white !important; margin: 0 !important; padding: 0 !important; }
             .no-print { display: none !important; }
-            .print-container { display: block !important; width: 100% !important; height: auto !important; margin: 0 !important; padding: 0 !important; position: static !important; }
+            .print-container { display: block !important; width: 100% !important; height: auto !important; margin: 0 !important; padding: 0 !important; position: static !important; background: white !important; }
             /* Asegura que el contenedor de la etiqueta ocupe 6x4in sin padding ni margen */
             .label-wrapper { display: block !important; width: 6in !important; height: 4in !important; margin: 0 !important; padding: 0 !important; border: none !important; box-shadow: none !important; border-radius: 0 !important; break-after: page; page-break-after: always; page-break-inside: avoid; }
+            .label-wrapper:last-child { break-after: auto !important; page-break-after: auto !important; }
             .label-preview-container { border: 2px solid #000 !important; width: 6in !important; height: 4in !important; }
         }
     </style>
@@ -176,10 +206,8 @@
                         <div style={{display: 'flex', flexDirection: 'column'}}>
                             <div className="lbl-title">FECHA DE ENTREGA</div><div className="lbl-medium" style={{fontSize: '20px'}}>{fechaEntrega}</div>
                         </div>
-                        {/* FIX: Eliminar flexGrow y añadir flexShrink: 0 para asegurar que el contenedor del código de barras no exceda su espacio vertical */}
                         <div style={{display: 'flex', flexDirection: 'column', alignItems: 'flex-end', flexShrink: 0}}>
                             <svg ref={svgRef} style={{maxWidth: '2.5in', width: '2.5in', height: 'auto'}}></svg>
-                            {/* FIX: Añadir whitespace-nowrap para evitar que el texto del código se envuelva y rompa la altura */}
                             <div className="text-[10px] font-mono text-center w-full bg-white px-1 relative z-10 whitespace-nowrap">{barcodeValue}</div>
                         </div>
                     </div>
