@@ -3,7 +3,7 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>Generador de Papeletas - Cirineo v3.5 (PZAS/HR Final)</title>
+    <title>Generador Cirineo v4.0 (PDF Fix + Imágenes)</title>
     
     <link rel="icon" href="https://raw.githubusercontent.com/jesusvn1993mplvt3-ai/CIRINEO/refs/heads/main/icon.ico">
     
@@ -15,7 +15,6 @@
     <script src="https://cdn.jsdelivr.net/npm/jsbarcode@3.11.0/dist/JsBarcode.all.min.js"></script>
     
     <script src="https://unpkg.com/html5-qrcode" type="text/javascript"></script>
-
     <script src="https://cdnjs.cloudflare.com/ajax/libs/html2pdf.js/0.10.1/html2pdf.bundle.min.js"></script>
 
     <script src="https://www.gstatic.com/firebasejs/10.7.1/firebase-app-compat.js"></script>
@@ -26,80 +25,104 @@
     <style>
         body { background-color: #f1f5f9; min-height: 100vh; font-family: 'Roboto Condensed', sans-serif; overflow: hidden; }
         @media (max-width: 1024px) { body { height: auto; overflow-y: auto; overflow-x: hidden; } }
+        
+        /* Ocultar elementos auxiliares */
         #reader a, #reader-hidden a { display: none !important; }
-        
-        /* ESTILO ORIGINAL DEL CONTENEDOR DE LA ETIQUETA EN PANTALLA */
-        .label-wrapper { margin-bottom: 2rem; padding: 1rem; background: white; border-radius: 0.5rem; box-shadow: 0 10px 15px -3px rgba(0, 0, 0, 0.1); page-break-inside: avoid; }
-        
-        /* ==========================================================================
-           CORRECCIÓN CRÍTICA PARA EL PDF
-           ========================================================================== */
-        
-        /* 1. Resetear el contenedor principal al generar PDF: Fondo blanco, sin padding, sin flex */
-        .pdf-mode.print-container {
-            background-color: #ffffff !important;
-            padding: 0 !important;
-            margin: 0 !important;
-            display: block !important; /* Importante: Quita el Flexbox para evitar huecos */
-            width: 6in !important;
-            height: auto !important;
-            overflow: visible !important;
+
+        /* --- CLASES CRÍTICAS PARA EL PDF --- */
+        /* Este contenedor fuerza el tamaño exacto independientemente de la pantalla del dispositivo */
+        .pdf-fixed-container {
+            width: 6in;
+            height: 4in;
+            background: white;
+            page-break-after: always;
+            break-after: page;
+            margin: 0;
+            overflow: hidden;
+            position: relative;
+            box-sizing: border-box;
+            display: flex;
         }
 
-        /* 2. Resetear el wrapper de la etiqueta: Sin márgenes, tamaño exacto */
-        .pdf-mode .label-wrapper {
-            margin: 0 !important;
-            padding: 0 !important;
-            box-shadow: none !important;
-            border: none !important;
-            border-radius: 0 !important;
-            width: 6in !important;
-            height: 4in !important;
-            break-after: page; 
-            page-break-after: always;
+        /* Contenedor principal para la vista previa en pantalla */
+        .preview-wrapper {
+            width: 100%;
+            max-width: 600px; /* Solo visual en pantalla */
+            aspect-ratio: 6/4;
+            margin-bottom: 2rem;
+            box-shadow: 0 4px 6px -1px rgba(0, 0, 0, 0.1);
+            background: white;
+        }
+
+        /* --- ESTRUCTURA DE LA ETIQUETA --- */
+        .label-layout {
+            width: 100%;
+            height: 100%;
+            display: flex;
+            border: 1px solid #ddd; /* Borde guia visual tenue */
+            padding: 0.25in; /* MARGEN SOLICITADO ALREDEDOR */
+            box-sizing: border-box;
+            background: white;
+        }
+
+        /* COLUMNA IZQUIERDA: IMAGEN */
+        .col-img {
+            width: 25%;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            border-right: 2px solid #000;
+            padding-right: 5px;
+            overflow: hidden;
+        }
+        .col-img img {
+            width: 100%;
+            height: 100%;
+            object-fit: contain;
+        }
+
+        /* COLUMNA CENTRO: DATOS */
+        .col-data {
+            width: 60%;
+            display: flex;
+            flex-direction: column;
+            border-right: 2px solid #000;
+        }
+
+        /* COLUMNA DERECHA: CODIGO BARRAS */
+        .col-barcode {
+            width: 15%;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            overflow: hidden;
             position: relative;
         }
 
-        /* 3. IMPORTANTE: Evitar que la última etiqueta genere una página en blanco extra */
-        .pdf-mode .label-wrapper:last-child {
-            break-after: auto !important;
-            page-break-after: auto !important;
-            margin-bottom: 0 !important;
-        }
-
-        /* ========================================================================== */
-
-        .label-preview-container { width: 6in; height: 4in; background-color: white; position: relative; box-sizing: border-box; border: 2px solid #000; display: flex; flex-direction: column; overflow: hidden; }
+        /* Estilos internos de las filas de datos */
         .lbl-row { display: flex; border-bottom: 2px solid #000; width: 100%; }
         .lbl-row:last-child { border-bottom: none; }
-        .lbl-col { border-right: 2px solid #000; padding: 4px 8px; display: flex; flex-direction: column; justify-content: center; overflow: hidden; }
+        .lbl-col { border-right: 2px solid #000; padding: 2px 4px; display: flex; flex-direction: column; justify-content: center; overflow: hidden; }
         .lbl-col:last-child { border-right: none; }
-        .lbl-title { font-size: 14px; font-weight: 700; color: #333; text-transform: uppercase; line-height: 1; margin-bottom: 2px; }
-        .lbl-big { font-family: 'Oswald', sans-serif; font-weight: 700; font-size: 42px; line-height: 0.9; color: #000; white-space: nowrap; }
-        .lbl-medium { font-family: 'Oswald', sans-serif; font-weight: 700; font-size: 26px; line-height: 1; color: #000; white-space: nowrap; }
-        .lbl-small { font-size: 16px; font-weight: 700; color: #000; }
-        .row-header { height: 18%; } .row-info { height: 12%; } .row-desc { height: 10%; align-items: center; }
-        .row-metrics { height: 22%; } .row-details { height: 23%; } .row-footer { height: 15%; }
+        
+        .lbl-title { font-size: 10px; font-weight: 700; color: #555; text-transform: uppercase; line-height: 1; margin-bottom: 1px; }
+        .lbl-big { font-family: 'Oswald', sans-serif; font-weight: 700; font-size: 32px; line-height: 0.9; color: #000; }
+        .lbl-medium { font-family: 'Oswald', sans-serif; font-weight: 700; font-size: 20px; line-height: 1; color: #000; }
+        .lbl-std { font-size: 14px; font-weight: 700; color: #000; line-height: 1.1; }
+
         .loader { border: 4px solid #f3f3f3; border-top: 4px solid #3498db; border-radius: 50%; width: 30px; height: 30px; animation: spin 1s linear infinite; }
         @keyframes spin { 0% { transform: rotate(0deg); } 100% { transform: rotate(360deg); } }
-        
-        @media print {
-            @page { size: 6in 4in; margin: 0mm; }
-            html, body { height: auto !important; overflow: visible !important; background: white !important; margin: 0 !important; padding: 0 !important; }
-            .no-print { display: none !important; }
-            .print-container { display: block !important; width: 100% !important; height: auto !important; margin: 0 !important; padding: 0 !important; position: static !important; background: white !important; }
-            /* Asegura que el contenedor de la etiqueta ocupe 6x4in sin padding ni margen */
-            .label-wrapper { display: block !important; width: 6in !important; height: 4in !important; margin: 0 !important; padding: 0 !important; border: none !important; box-shadow: none !important; border-radius: 0 !important; break-after: page; page-break-after: always; page-break-inside: avoid; }
-            .label-wrapper:last-child { break-after: auto !important; page-break-after: auto !important; }
-            .label-preview-container { border: 2px solid #000 !important; width: 6in !important; height: 4in !important; }
-        }
+
+        /* Ocultar scrollbar en impresión */
+        .hide-scrollbar::-webkit-scrollbar { display: none; }
+        .hide-scrollbar { -ms-overflow-style: none; scrollbar-width: none; }
     </style>
 </head>
 <body>
     <div id="root"></div>
 
     <script type="text/babel">
-        const { useState, useEffect, useRef, useMemo, useCallback } = React;
+        const { useState, useEffect, useRef, useMemo } = React;
 
         const firebaseConfig = {
             apiKey: "AIzaSyBqHgV4vDat1-VmZfKbiPg7nuiX-ROcexw",
@@ -125,110 +148,206 @@
             return <div ref={containerRef} className="inline-block" style={{ width: size, height: size }}></div>;
         };
 
-        const ProductionLabel = ({ labelData, shiftHours }) => {
+        // --- MODAL DE REPOSITORIO ---
+        const RepoModal = ({ isVisible, onClose }) => {
+            const [url, setUrl] = useState('');
+            
+            useEffect(() => {
+                const saved = localStorage.getItem('cirineo_img_repo');
+                if(saved) setUrl(saved);
+            }, [isVisible]);
+
+            const handleSave = () => {
+                let cleanUrl = url.trim();
+                // Eliminar slash final si existe
+                if(cleanUrl.endsWith('/')) cleanUrl = cleanUrl.slice(0, -1);
+                localStorage.setItem('cirineo_img_repo', cleanUrl);
+                alert('Repositorio guardado correctamente.');
+                onClose();
+            };
+
+            if(!isVisible) return null;
+
+            return (
+                <div className="fixed inset-0 bg-black/80 z-[100] flex items-center justify-center p-4">
+                    <div className="bg-white rounded-lg shadow-xl w-full max-w-md overflow-hidden">
+                        <div className="bg-slate-800 text-white p-3 font-bold flex justify-between items-center">
+                            <span>CONFIGURAR IMÁGENES</span>
+                            <button onClick={onClose}><Icon name="x"/></button>
+                        </div>
+                        <div className="p-4">
+                            <label className="block text-sm font-bold text-slate-700 mb-2">URL del Repositorio (Carpeta):</label>
+                            <input 
+                                type="text" 
+                                value={url} 
+                                onChange={e => setUrl(e.target.value)}
+                                placeholder="https://raw.githubusercontent.com/usuario/repo/main/imagenes"
+                                className="w-full border border-slate-300 rounded p-2 text-sm mb-2"
+                            />
+                            <p className="text-xs text-slate-500 mb-4">El sistema buscará automáticamente: <code>URL/MODELO.jpg</code></p>
+                            <button onClick={handleSave} className="w-full bg-blue-600 text-white font-bold py-2 rounded hover:bg-blue-700">GUARDAR</button>
+                        </div>
+                    </div>
+                </div>
+            );
+        };
+
+        // --- COMPONENTE DE ETIQUETA ---
+        const ProductionLabel = ({ labelData, shiftHours, repoUrl }) => {
             const svgRef = useRef(null);
             const order = labelData; 
             const subPiece = order.subPiecesData ? order.subPiecesData.find(sp => sp.pieza === order.piezaNombre) : (order.subPiecesData?.[0] || {});
             
-            // Los datos de Nylon y Lycra ya no son necesarios en el render, pero se mantienen por si la estructura de datos lo requiere.
-            // const materialNylon = order.threading ? order.threading.find(t => t.material && t.material.toUpperCase().includes('NYLON')) : null;
-            // const materialLycra = order.threading ? order.threading.find(t => t.material && t.material.toUpperCase().includes('LYCRA')) : null;
-            // const lycraText = materialLycra ? materialLycra.material.replace(/LYCRA/i, '').trim() : (order.threading && order.threading[1] ? order.threading[1].material : 'N/A');
-            // const nylonText = materialNylon ? materialNylon.material.replace(/NYLON/i, '').trim() : (order.threading && order.threading[0] ? order.threading[0].material : 'N/A');
-            
             const barcodeValue = order.packageCode; 
             const fechaEntrega = order.fechaEntrega || new Date(Date.now() + 7 * 24 * 60 * 60 * 1000).toLocaleDateString('es-MX');
 
-            // --- Cálculos de Rendimiento (MODIFICADOS) ---
+            // Cálculos
             const tiempo = parseFloat(subPiece?.tiempo);
-            const hours = parseFloat(shiftHours) || 12; // Usar prop o 12 por defecto
-            
-            // Pzas / 1 Hr = 60 minutos / tiempo por pieza
-            const pzas1hr = tiempo > 0 ? (60 / tiempo).toFixed(1) : '---'; 
-            
-            // Pzas / Turno = (Horas de turno * 60 minutos) / tiempo por pieza
-            const pzasShift = tiempo > 0 ? ((hours * 60) / tiempo).toFixed(1) : '---'; 
-            // ------------------------------------
+            const hours = parseFloat(shiftHours) || 12;
+            const pzas1hr = tiempo > 0 ? (60 / tiempo).toFixed(1) : '-'; 
+            const pzasShift = tiempo > 0 ? ((hours * 60) / tiempo).toFixed(1) : '-'; 
 
+            // Gestión de Imagen
+            const [imgSrc, setImgSrc] = useState(null);
+            
+            useEffect(() => {
+                if(repoUrl && order.codigo) {
+                    // Intenta cargar jpg primero, el onerror manejará png o fallback
+                    setImgSrc(`${repoUrl}/${order.codigo}.jpg`);
+                }
+            }, [repoUrl, order.codigo]);
+
+            const handleImgError = (e) => {
+                if(e.target.src.endsWith('.jpg')) {
+                    e.target.src = `${repoUrl}/${order.codigo}.png`;
+                } else {
+                    e.target.style.display = 'none'; // Si falla png tambien, ocultar
+                }
+            };
+
+            // Barcode
             useEffect(() => {
                 if (svgRef.current && barcodeValue) {
                     try {
-                        JsBarcode(svgRef.current, barcodeValue, { format: "CODE128", lineColor: "#000", width: 1.5, height: 40, displayValue: false, margin: 0 });
-                        svgRef.current.style.width = '2.5in'; svgRef.current.style.height = 'auto'; 
+                        // displayValue: false para que sea limpio
+                        JsBarcode(svgRef.current, barcodeValue, { 
+                            format: "CODE128", 
+                            lineColor: "#000", 
+                            width: 2, 
+                            height: 80, 
+                            displayValue: false, 
+                            margin: 0 
+                        });
                     } catch (e) { console.error("Error barcode", e); }
                 }
             }, [barcodeValue]);
 
             return (
-                <div className="label-preview-container">
-                    <div className="lbl-row row-header">
-                        <div className="lbl-col" style={{width: '60%'}}>
-                            <div className="lbl-title">MODELO</div><div className="lbl-big">{order.codigo || 'S/N'}</div>
-                        </div>
-                        <div className="lbl-col" style={{width: '40%'}}>
-                            <div className="lbl-title">TOTAL PIEZAS ORDEN</div><div className="lbl-big">{order.totalPedido || 0}</div>
-                        </div>
+                <div className="label-layout">
+                    {/* ZONA 1: IMAGEN (IZQUIERDA) */}
+                    <div className="col-img">
+                        {imgSrc ? (
+                            <img 
+                                src={imgSrc} 
+                                onError={handleImgError} 
+                                alt={order.codigo}
+                            />
+                        ) : (
+                            <div className="text-slate-300 text-xs text-center font-bold">SIN<br/>IMAGEN</div>
+                        )}
                     </div>
-                    <div className="lbl-row row-info">
-                        <div className="lbl-col" style={{width: '50%'}}>
-                            <div className="lbl-title">PARTIDA</div><div className="lbl-medium">{order.partida || '---'}</div>
-                        </div>
-                        <div className="lbl-col" style={{width: '50%'}}>
-                            <div className="lbl-title">CLIENTE</div><div className="lbl-medium" style={{fontSize: order.cliente?.length > 10 ? '22px' : '26px'}}>{order.cliente || '---'}</div>
-                        </div>
-                    </div>
-                    <div className="lbl-row row-desc">
-                        <div className="lbl-col" style={{flexDirection: 'row', alignItems: 'baseline', gap: '10px', width: '100%'}}>
-                            <span className="lbl-title">DESCRIPCION:</span><span style={{fontSize: '16px', fontWeight: 'bold'}}>{order.piezaNombre || subPiece?.pieza || 'ESTANDAR'}</span>
-                        </div>
-                    </div>
-                    <div className="lbl-row row-metrics">
-                        <div className="lbl-col" style={{width: '33.33%', textAlign: 'center'}}>
-                            <div className="lbl-title" style={{fontSize: '11px'}}>PAQUETE<br/>ACTUAL</div><div className="lbl-big" style={{fontSize: '48px'}}>{order.displayPackageId}</div>
-                        </div>
-                        <div className="lbl-col" style={{width: '33.33%', backgroundColor: '#e0e0e0', textAlign: 'center'}}>
-                            <div className="lbl-title" style={{fontSize: '11px'}}>PIEZAS EN<br/>PAQUETE</div><div className="lbl-big" style={{fontSize: '48px'}}>{order.piecesInPackage}</div>
-                        </div>
-                        <div className="lbl-col" style={{width: '33.33%', textAlign: 'center'}}>
-                            <div className="lbl-title">MAQUINA</div><div className="lbl-big" style={{fontSize: '48px'}}>{order.maquina || '0'}</div>
-                        </div>
-                    </div>
-                    <div className="lbl-row row-details">
-                        
-                        {/* IZQUIERDA: Pzas/Hr y Pzas/Turno (Lado a lado) */}
-                        <div style={{width: '50%', display: 'flex', borderRight: '2px solid black'}}> 
-                            {/* Pzas / 1 Hr */}
-                            <div className="lbl-col" style={{flex: 1, padding: '2px', textAlign: 'center', borderRight: '1px solid black'}}>
-                                <div className="lbl-title" style={{fontSize: '14px', marginBottom: '4px'}}>PZAS / 1 HR</div>
-                                <div className="lbl-big" style={{fontSize: '32px', lineHeight: '1'}}>{pzas1hr}</div>
+
+                    {/* ZONA 2: DATOS (CENTRO) */}
+                    <div className="col-data">
+                        {/* Cabecera: Modelo y Total */}
+                        <div className="lbl-row" style={{height: '18%'}}>
+                            <div className="lbl-col" style={{width: '65%'}}>
+                                <div className="lbl-title">MODELO</div>
+                                <div className="lbl-big">{order.codigo || 'S/N'}</div>
                             </div>
-                            {/* Pzas / X Hrs (Shift) */}
-                            <div className="lbl-col" style={{flex: 1, padding: '2px', textAlign: 'center', borderRight: 'none'}}> 
-                                <div className="lbl-title" style={{fontSize: '14px', marginBottom: '4px'}}>PZAS / {hours} HRS</div> {/* Título Dinámico */}
-                                <div className="lbl-big" style={{fontSize: '32px', lineHeight: '1'}}>{pzasShift}</div>
+                            <div className="lbl-col" style={{width: '35%'}}>
+                                <div className="lbl-title">TOTAL ORDEN</div>
+                                <div className="lbl-medium">{order.totalPedido || 0}</div>
                             </div>
                         </div>
                         
-                        {/* DERECHA: Talla, Peso (g), Tiempo (min) (Original) */}
-                        <div style={{width: '50%', display: 'grid', gridTemplateColumns: '1fr 1fr', gridTemplateRows: '1fr 1fr'}}>
-                            <div className="lbl-col" style={{borderBottom: '1px solid black', borderRight: '1px solid black', padding: '2px'}}>
-                                <div className="lbl-title">TALLA</div><div className="lbl-medium" style={{fontSize: '20px'}}>{subPiece?.talla || 'UNI'}</div>
+                        {/* Cliente y Partida */}
+                        <div className="lbl-row" style={{height: '14%'}}>
+                            <div className="lbl-col" style={{width: '70%'}}>
+                                <div className="lbl-title">CLIENTE</div>
+                                <div className="lbl-std truncate">{order.cliente || '---'}</div>
                             </div>
-                            <div className="lbl-col" style={{borderBottom: '1px solid black', padding: '2px'}}>
-                                <div className="lbl-title">PESO (g)</div><div className="lbl-small">{subPiece?.peso || '---'}</div>
+                            <div className="lbl-col" style={{width: '30%'}}>
+                                <div className="lbl-title">PARTIDA</div>
+                                <div className="lbl-std">{order.partida || '-'}</div>
                             </div>
-                            <div className="lbl-col" style={{gridColumn: 'span 2', padding: '2px', flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center'}}>
-                                <div className="lbl-title">TIEMPO (min)</div><div className="lbl-small" style={{fontSize: '20px', marginRight: '10px'}}>{subPiece?.tiempo || '---'}</div>
+                        </div>
+
+                        {/* Descripción de pieza */}
+                        <div className="lbl-row" style={{height: '12%', alignItems: 'center', backgroundColor: '#f8fafc'}}>
+                            <div className="lbl-col" style={{width: '100%', flexDirection: 'row', gap: '5px', border: 'none'}}>
+                                <span className="lbl-title">PIEZA:</span>
+                                <span className="lbl-std" style={{fontSize: '16px'}}>{order.piezaNombre || 'ESTANDAR'}</span>
+                            </div>
+                        </div>
+
+                        {/* Métricas Principales */}
+                        <div className="lbl-row" style={{height: '24%'}}>
+                            <div className="lbl-col" style={{width: '33%', textAlign: 'center'}}>
+                                <div className="lbl-title">PAQUETE</div>
+                                <div className="lbl-big" style={{fontSize: '36px'}}>{order.displayPackageId}</div>
+                            </div>
+                            <div className="lbl-col" style={{width: '34%', backgroundColor: '#eee', textAlign: 'center'}}>
+                                <div className="lbl-title">CANTIDAD</div>
+                                <div className="lbl-big" style={{fontSize: '36px'}}>{order.piecesInPackage}</div>
+                            </div>
+                            <div className="lbl-col" style={{width: '33%', textAlign: 'center'}}>
+                                <div className="lbl-title">MAQUINA</div>
+                                <div className="lbl-medium">{order.maquina || '0'}</div>
+                            </div>
+                        </div>
+
+                        {/* Detalles Técnicos */}
+                        <div className="lbl-row" style={{flexGrow: 1}}>
+                            <div className="lbl-col" style={{width: '25%'}}>
+                                <div className="lbl-title">TALLA</div>
+                                <div className="lbl-medium">{subPiece?.talla || 'U'}</div>
+                            </div>
+                            <div className="lbl-col" style={{width: '25%'}}>
+                                <div className="lbl-title">PESO(g)</div>
+                                <div className="lbl-std">{subPiece?.peso || '-'}</div>
+                            </div>
+                            <div className="lbl-col" style={{width: '25%'}}>
+                                <div className="lbl-title">PZS/HR</div>
+                                <div className="lbl-std" style={{fontSize: '18px'}}>{pzas1hr}</div>
+                            </div>
+                             <div className="lbl-col" style={{width: '25%'}}>
+                                <div className="lbl-title">{hours} HRS</div>
+                                <div className="lbl-std" style={{fontSize: '18px'}}>{pzasShift}</div>
+                            </div>
+                        </div>
+                         {/* Footer Pequeño */}
+                        <div className="lbl-row" style={{height: '15px', borderBottom: 'none'}}>
+                            <div style={{fontSize: '9px', width: '100%', textAlign: 'center', fontWeight: 'bold'}}>
+                                ENTREGA: {fechaEntrega}
                             </div>
                         </div>
                     </div>
-                    <div className="lbl-row row-footer" style={{padding: '0 10px', alignItems: 'center', justifyContent: 'space-between'}}>
-                        <div style={{display: 'flex', flexDirection: 'column'}}>
-                            <div className="lbl-title">FECHA DE ENTREGA</div><div className="lbl-medium" style={{fontSize: '20px'}}>{fechaEntrega}</div>
-                        </div>
-                        <div style={{display: 'flex', flexDirection: 'column', alignItems: 'flex-end', flexShrink: 0}}>
-                            <svg ref={svgRef} style={{maxWidth: '2.5in', width: '2.5in', height: 'auto'}}></svg>
-                            <div className="text-[10px] font-mono text-center w-full bg-white px-1 relative z-10 whitespace-nowrap">{barcodeValue}</div>
+
+                    {/* ZONA 3: BARCODE (DERECHA - LADO ANGOSTO) */}
+                    <div className="col-barcode">
+                        {/* Contenedor rotado 90 grados para usar el alto como ancho */}
+                        <div style={{
+                            transform: 'rotate(90deg)', 
+                            transformOrigin: 'center', 
+                            width: '3.5in', /* El alto de la etiqueta es 4in, usamos espacio seguro */
+                            display: 'flex',
+                            flexDirection: 'column',
+                            alignItems: 'center',
+                            justifyContent: 'center'
+                        }}>
+                             <svg ref={svgRef} style={{width: '100%', height: 'auto'}}></svg>
+                             <div style={{fontSize: '10px', fontFamily: 'monospace', marginTop: '5px'}}>{barcodeValue}</div>
                         </div>
                     </div>
                 </div>
@@ -286,33 +405,24 @@
                 for (const order of allOrders) {
                     if (order.progreso) {
                         const pkg = order.progreso.find(p => p.codigoUnico === scannedCode);
-                        if (pkg) {
-                            foundPackage = pkg;
-                            foundOrder = order;
-                            break;
-                        }
+                        if (pkg) { foundPackage = pkg; foundOrder = order; break; }
                     }
                 }
 
                 if (!foundPackage || !foundOrder) {
-                    setScanStatus({ message: `Código ${scannedCode} NO encontrado en ninguna orden activa.`, type: 'error' });
+                    setScanStatus({ message: `Código ${scannedCode} NO encontrado.`, type: 'error' });
                     return;
                 }
 
                 setScans(prev => [...prev, scannedCode]);
-                setScanStatus({ message: `¡Encontrado! ${foundPackage.piezaNombre} (${foundPackage.paqueteNum}/${foundPackage.paquetesDePieza})`, type: 'success' });
+                setScanStatus({ message: `¡OK! ${foundPackage.piezaNombre} (${foundPackage.paqueteNum})`, type: 'success' });
             };
-
-            const handleRemoveScan = (codeToRemove) => setScans(prev => prev.filter(code => code !== codeToRemove));
 
             const handleSaveAll = async () => {
                 if (scans.length === 0 || isSaving) return;
                 setIsSaving(true);
-                setScanStatus({ message: `Guardando registros...`, type: 'info' });
-
                 const successfulScans = [];
                 const failedScans = [];
-                const tejedoraName = "Balta"; 
 
                 for (const scannedCode of scans) {
                     try {
@@ -324,21 +434,17 @@
                                 if (pkg) { foundPackage = pkg; foundOrder = order; break; }
                             }
                         }
-
-                        if (!foundPackage) { failedScans.push(scannedCode); continue; }
+                        if (!foundPackage) continue;
 
                         const globalScanCheck = await db.collection('registro_produccion').where('codigo_paquete', '==', scannedCode).get();
-                        if (!globalScanCheck.empty) {
-                            failedScans.push(`${scannedCode} (Duplicado)`);
-                            continue;
-                        }
+                        if (!globalScanCheck.empty) { failedScans.push(scannedCode); continue; }
 
                         await db.collection('registro_produccion').doc().set({
                             codigo_paquete: scannedCode, 
                             orderId: String(foundOrder.id), 
                             fecha: FieldValue.serverTimestamp(),
-                            fecha_legible: new Date().toLocaleDateString('es-MX', { day: '2-digit', month: '2-digit', year: 'numeric', hour: '2-digit', minute: '2-digit' }).replace(/\//g, '/'), 
-                            tejedor: tejedoraName,
+                            fecha_legible: new Date().toLocaleDateString('es-MX', { day: '2-digit', month: '2-digit', year: 'numeric', hour: '2-digit', minute: '2-digit' }), 
+                            tejedor: "Balta",
                             tipo: "produccion",
                             modelo: foundOrder.codigo,
                             partida: foundOrder.partida,
@@ -346,23 +452,12 @@
                             paquete_total: foundPackage.paquetesDePieza,
                             piezas_en_paquete: foundPackage.cantidad
                         });
-                        
                         successfulScans.push(scannedCode);
-
-                    } catch (error) {
-                        console.error("Error saving:", error);
-                        failedScans.push(`${scannedCode} (Error)`);
-                    }
+                    } catch (error) { failedScans.push(scannedCode); }
                 }
-
                 setIsSaving(false);
-                if (successfulScans.length > 0) {
-                    onScanSaved(); 
-                    onClose(); 
-                    alert(`Guardados: ${successfulScans.length}. Fallidos: ${failedScans.length}`);
-                } else {
-                    setScanStatus({ message: `Error al guardar.`, type: 'error' });
-                }
+                onScanSaved(); 
+                onClose(); 
             };
 
             if (!isVisible) return null;
@@ -371,72 +466,25 @@
                 <div className="fixed inset-0 bg-black/80 z-[100] flex flex-col items-center justify-center p-4">
                     <div className="w-full max-w-2xl bg-white rounded-xl shadow-2xl overflow-hidden flex flex-col max-h-[95vh]">
                         <div className="flex justify-between items-center p-4 bg-slate-800 text-white">
-                            <h2 className="font-bold text-xl flex items-center gap-2"><Icon name="scan"/> ESCANEO DE PAQUETES</h2>
-                            <button onClick={onClose} className="bg-red-600 hover:bg-red-700 text-white px-3 py-1.5 rounded text-sm font-bold">CERRAR</button>
+                            <h2 className="font-bold text-xl flex items-center gap-2"><Icon name="scan"/> ESCANEO RÁPIDO</h2>
+                            <button onClick={onClose} className="bg-red-600 px-3 py-1 rounded text-sm font-bold">X</button>
                         </div>
                         <div className="flex flex-col md:flex-row flex-grow min-h-0">
-                            <div className="w-full md:w-1/2 bg-black flex flex-col justify-center items-center p-2 relative">
-                                <div id="reader" className="w-full aspect-video md:aspect-square bg-black"></div>
-                                <div className={`mt-2 p-2 rounded text-xs text-center font-medium w-full bg-slate-100`}>{scanStatus.message}</div>
+                            <div className="w-full md:w-1/2 bg-black flex flex-col justify-center items-center p-2">
+                                <div id="reader" className="w-full bg-black"></div>
+                                <div className="mt-2 text-white text-center text-xs">{scanStatus.message}</div>
                             </div>
                             <div className="w-full md:w-1/2 flex flex-col p-4">
-                                <h3 className="font-bold text-slate-700 mb-3">Códigos Leídos ({scans.length})</h3>
-                                <div className="flex-grow overflow-y-auto border border-slate-300 rounded p-2 mb-4 bg-slate-50">
-                                    <ul className="space-y-1">
-                                        {scans.map(code => (
-                                            <li key={code} className="flex justify-between items-center p-2 bg-white rounded shadow-sm border border-slate-200">
-                                                <span className="font-mono text-sm font-bold text-slate-800">{code}</span>
-                                                <button onClick={() => handleRemoveScan(code)} className="text-red-500"><Icon name="x" size={14}/></button>
-                                            </li>
-                                        ))}
-                                    </ul>
+                                <h3 className="font-bold text-slate-700 mb-3">Leídos ({scans.length})</h3>
+                                <div className="flex-grow overflow-y-auto border p-2 mb-4 bg-slate-50 h-32">
+                                    {scans.map(code => <div key={code} className="text-xs font-mono border-b p-1">{code}</div>)}
                                 </div>
-                                <button onClick={handleSaveAll} disabled={scans.length === 0 || isSaving} className={`w-full py-3 rounded-lg font-bold text-white ${scans.length === 0 || isSaving ? 'bg-slate-400' : 'bg-green-600'}`}>
-                                    {isSaving ? 'Guardando...' : 'GUARDAR TODO'}
+                                <button onClick={handleSaveAll} disabled={scans.length === 0 || isSaving} className="w-full py-3 bg-green-600 text-white font-bold rounded">
+                                    {isSaving ? 'GUARDANDO...' : 'GUARDAR TODO'}
                                 </button>
                             </div>
                         </div>
                     </div>
-                </div>
-            );
-        };
-
-        const ScanTracker = ({ selectedOrder, packageLabels, onOpenQuickScan }) => {
-            const [scannedData, setScannedData] = useState([]);
-            const orderId = selectedOrder?.id;
-            useEffect(() => {
-                if (!orderId) { setScannedData([]); return; }
-                const unsubscribe = db.collection('registro_produccion').where('orderId', '==', String(orderId)).onSnapshot(snapshot => {
-                    setScannedData(snapshot.docs.map(doc => doc.data()));
-                });
-                return () => unsubscribe();
-            }, [orderId]);
-            
-            const { scannedPackages, pendingPackages } = useMemo(() => {
-                if (!orderId) return { scannedPackages: [], pendingPackages: [] };
-                const scannedCodes = new Set(scannedData.map(d => d.codigo_paquete));
-                const packages = packageLabels.map(label => ({
-                    ...label,
-                    isScanned: scannedCodes.has(label.packageCode),
-                }));
-                return {
-                    scannedPackages: packages.filter(p => p.isScanned),
-                    pendingPackages: packages.filter(p => !p.isScanned)
-                };
-            }, [packageLabels, scannedData, orderId]);
-
-            return (
-                <div className="w-full lg:w-96 bg-white border-l border-slate-200 flex flex-col no-print relative shrink-0">
-                    <div className="p-4 border-b bg-slate-50">
-                        <h3 className="font-bold text-lg flex items-center gap-2 text-slate-800 mb-3"><Icon name="scan"/> Control</h3>
-                        <button onClick={onOpenQuickScan} className="w-full py-2 bg-blue-600 text-white rounded font-bold hover:bg-blue-700 transition shadow-md flex items-center justify-center gap-2 text-sm"><Icon name="camera" size={18} /> ESCANEAR</button>
-                    </div>
-                    {selectedOrder && (
-                        <div className="flex-grow overflow-y-auto p-3 space-y-4">
-                            <div className="bg-red-50 p-3 rounded"><h4 className="font-bold text-red-800 text-xs mb-2">PENDIENTES</h4><div className="grid grid-cols-4 gap-2">{pendingPackages.map(p => <div key={p.packageCode} className="p-1 text-center bg-white border border-red-300 rounded text-xs font-bold">{p.packageIndex}</div>)}</div></div>
-                            <div className="bg-green-50 p-3 rounded"><h4 className="font-bold text-green-800 text-xs mb-2">LISTOS</h4><div className="grid grid-cols-4 gap-2">{scannedPackages.map(p => <div key={p.packageCode} className="p-1 text-center bg-white border border-green-300 rounded text-xs font-bold text-green-800">{p.packageIndex}</div>)}</div></div>
-                        </div>
-                    )}
                 </div>
             );
         };
@@ -447,13 +495,30 @@
             const [packageLabels, setPackageLabels] = useState([]); 
             const [filterText, setFilterText] = useState('');
             const [showScanner, setShowScanner] = useState(false);
+            const [showRepoModal, setShowRepoModal] = useState(false);
             const [isGeneratingPdf, setIsGeneratingPdf] = useState(false); 
-            const [shiftHours, setShiftHours] = useState(12); // Nuevo estado para las horas de turno
+            const [shiftHours, setShiftHours] = useState(12);
+            const [repoUrl, setRepoUrl] = useState('');
 
-            const generatePackageLabels = (order) => {
-                if (order.progreso && order.progreso.length > 0) {
-                    return order.progreso.map(p => ({
-                        ...order,
+            // Ref para el contenedor oculto de PDF
+            const pdfContainerRef = useRef(null);
+
+            useEffect(() => {
+                const savedRepo = localStorage.getItem('cirineo_img_repo');
+                if(savedRepo) setRepoUrl(savedRepo);
+
+                const unsubscribe = db.collection('orders').where('status', '!=', 'ARCHIVADO').onSnapshot(snapshot => {
+                        const fetchedOrders = snapshot.docs.map(doc => doc.data());
+                        fetchedOrders.sort((a, b) => b.id - a.id);
+                        setOrders(fetchedOrders);
+                    });
+                return () => unsubscribe();
+            }, [showRepoModal]);
+            
+            useEffect(() => {
+                if (selectedOrder && selectedOrder.progreso) {
+                    const labels = selectedOrder.progreso.map(p => ({
+                        ...selectedOrder,
                         piezaNombre: p.piezaNombre, 
                         packageIndex: p.paqueteNum,
                         totalPackages: p.paquetesDePieza,
@@ -461,21 +526,8 @@
                         packageCode: p.codigoUnico, 
                         displayPackageId: `${p.paqueteNum}/${p.paquetesDePieza}`
                     }));
-                }
-                return [];
-            };
-
-            useEffect(() => {
-                const unsubscribe = db.collection('orders').where('status', '!=', 'ARCHIVADO').onSnapshot(snapshot => {
-                        const fetchedOrders = snapshot.docs.map(doc => doc.data());
-                        fetchedOrders.sort((a, b) => b.id - a.id);
-                        setOrders(fetchedOrders);
-                    });
-                return () => unsubscribe();
-            }, []);
-            
-            useEffect(() => {
-                if (selectedOrder) { setPackageLabels(generatePackageLabels(selectedOrder)); } else { setPackageLabels([]); }
+                    setPackageLabels(labels);
+                } else { setPackageLabels([]); }
             }, [selectedOrder]);
 
             const filteredOrders = useMemo(() => {
@@ -484,89 +536,140 @@
                 return orders.filter(o => (o.codigo && o.codigo.includes(txt)) || (o.cliente && o.cliente.includes(txt)));
             }, [orders, filterText]);
 
-            const handlePrint = () => { if(packageLabels.length > 0) window.print(); };
-
-            // === FUNCIÓN PARA DESCARGAR PDF (FIXEADA) ===
-            const handleDownloadPDF = () => {
+            // === LÓGICA DE PDF MEJORADA ===
+            const handleDownloadPDF = async () => {
                 if (packageLabels.length === 0) return;
                 setIsGeneratingPdf(true);
+
+                // Esperar un momento para que React renderice el contenedor oculto si hubo cambios
+                await new Promise(resolve => setTimeout(resolve, 500));
                 
-                const element = document.querySelector('.print-container');
-                
+                const element = pdfContainerRef.current;
+                if(!element) {
+                    alert("Error interno: Contenedor PDF no encontrado.");
+                    setIsGeneratingPdf(false);
+                    return;
+                }
+
                 const opt = {
-                    margin:       0,
+                    margin:       [0, 0], // Margen 0 porque ya dimos padding en CSS
                     filename:     `${selectedOrder.codigo || 'orden'}_${packageLabels.length}pqts.pdf`,
-                    image:        { type: 'jpeg', quality: 0.98 },
-                    html2canvas:  { scale: 2, useCORS: true, logging: false, backgroundColor: '#ffffff' }, 
-                    jsPDF:        { unit: 'in', format: [6, 4], orientation: 'landscape' } 
+                    image:        { type: 'jpeg', quality: 1.0 },
+                    html2canvas:  { 
+                        scale: 2, // Mejor calidad
+                        useCORS: true, 
+                        logging: false,
+                        windowWidth: 1200 // Simular pantalla grande para evitar layout movil
+                    },
+                    jsPDF:        { unit: 'in', format: [6, 4], orientation: 'landscape' }
                 };
 
-                element.classList.add('pdf-mode');
-
                 html2pdf().set(opt).from(element).save().then(() => {
-                    element.classList.remove('pdf-mode');
                     setIsGeneratingPdf(false);
                 }).catch(err => {
-                    console.error("Error al generar PDF:", err);
-                    element.classList.remove('pdf-mode');
+                    console.error("PDF Error:", err);
                     setIsGeneratingPdf(false);
-                    alert("Error al generar PDF. Revise la consola.");
+                    alert("Error al generar PDF.");
                 });
             };
 
             return (
                 <div className="flex flex-col lg:flex-row h-screen w-full">
-                    <div className="w-full lg:w-80 bg-slate-800 text-white flex flex-col border-r border-slate-700 shadow-xl no-print z-10 shrink-0 h-64 lg:h-auto">
+                    {/* SIDEBAR */}
+                    <div className="w-full lg:w-72 bg-slate-800 text-white flex flex-col border-r border-slate-700 shadow-xl shrink-0 h-64 lg:h-auto">
                         <div className="p-4 bg-slate-900 border-b border-slate-700">
-                            <h1 className="text-xl font-bold text-yellow-400">PAPELETAS</h1>
-                            <input type="text" placeholder="Buscar..." value={filterText} onChange={e => setFilterText(e.target.value)} className="w-full mt-2 bg-slate-800 border border-slate-600 rounded p-2 text-sm" />
-                            {/* NUEVO INPUT PARA HORAS DE TURNO */}
-                            <div className="mt-4">
-                                <label className="text-xs font-semibold text-slate-300">Horas de Turno (Pzas/Turno):</label>
-                                <input 
-                                    type="number" 
-                                    value={shiftHours} 
-                                    onChange={e => setShiftHours(e.target.value)} 
-                                    min="1" 
-                                    max="24" 
-                                    className="w-full mt-1 bg-slate-800 border border-slate-600 rounded p-2 text-sm text-yellow-400 font-bold" 
-                                />
+                            <h1 className="text-xl font-bold text-yellow-400 tracking-tighter">CIRINEO v4.0</h1>
+                            <input type="text" placeholder="Buscar orden..." value={filterText} onChange={e => setFilterText(e.target.value)} className="w-full mt-2 bg-slate-800 border border-slate-600 rounded p-2 text-sm" />
+                            
+                            <div className="mt-4 grid grid-cols-2 gap-2">
+                                <div>
+                                    <label className="text-[10px] text-slate-400">HORAS TURNO</label>
+                                    <input type="number" value={shiftHours} onChange={e => setShiftHours(e.target.value)} className="w-full bg-slate-700 border border-slate-600 rounded p-1 text-center font-bold text-yellow-400" />
+                                </div>
+                                <div>
+                                    <label className="text-[10px] text-slate-400">CONFIG</label>
+                                    <button onClick={() => setShowRepoModal(true)} className="w-full bg-slate-700 hover:bg-slate-600 border border-slate-500 rounded p-1 text-xs font-bold flex justify-center items-center gap-1">
+                                        <Icon name="image" size={12}/> IMÁGENES
+                                    </button>
+                                </div>
                             </div>
                         </div>
                         <div className="flex-grow overflow-y-auto p-2 space-y-2">
                             {filteredOrders.map(order => (
-                                <div key={order.id} onClick={() => setSelectedOrder(order)} className={`p-3 rounded cursor-pointer border-l-4 transition-all ${selectedOrder?.id === order.id ? 'bg-slate-700 border-yellow-400' : 'bg-slate-800/50 border-transparent'}`}>
-                                    <div className="font-bold">{order.codigo}</div>
+                                <div key={order.id} onClick={() => setSelectedOrder(order)} className={`p-3 rounded cursor-pointer border-l-4 transition-all ${selectedOrder?.id === order.id ? 'bg-slate-700 border-yellow-400' : 'bg-slate-800/50 border-transparent hover:bg-slate-700'}`}>
+                                    <div className="font-bold text-sm">{order.codigo}</div>
                                     <div className="text-xs text-slate-400">{order.cliente}</div>
                                 </div>
                             ))}
                         </div>
                     </div>
 
-                    <div className="flex-grow bg-slate-100 flex flex-col relative overflow-auto h-96 lg:h-auto">
-                        <div className="bg-white p-4 shadow-sm border-b flex justify-between items-center no-print sticky top-0 z-10">
-                            <h2 className="font-bold text-slate-700">{selectedOrder ? `${selectedOrder.codigo} (${packageLabels.length} PAQUETES)` : 'Seleccione orden'}</h2>
+                    {/* MAIN CONTENT */}
+                    <div className="flex-grow bg-slate-100 flex flex-col relative overflow-hidden">
+                        {/* Header */}
+                        <div className="bg-white p-3 shadow-sm border-b flex justify-between items-center z-10">
+                            <h2 className="font-bold text-slate-700 text-lg truncate">
+                                {selectedOrder ? `${selectedOrder.codigo} - ${packageLabels.length} PAQUETES` : 'Seleccione una orden'}
+                            </h2>
                             {selectedOrder && (
-                                <div className="flex gap-2">
-                                    <button onClick={handleDownloadPDF} disabled={isGeneratingPdf} className={`px-3 py-2 text-white rounded font-bold text-sm flex gap-2 ${isGeneratingPdf ? 'bg-slate-400 cursor-wait' : 'bg-red-600 hover:bg-red-700 shadow-md'}`}>
-                                        <Icon name="download" size={16}/> {isGeneratingPdf ? 'GENERANDO...' : 'DESCARGAR PDF'}
-                                    </button>
-                                    <button onClick={handlePrint} className="px-3 py-2 bg-slate-900 text-white rounded font-bold text-sm flex gap-2 hover:bg-slate-800 shadow-md">
-                                        <Icon name="printer" size={16}/> IMPRIMIR
-                                    </button>
+                                <button onClick={handleDownloadPDF} disabled={isGeneratingPdf} className={`px-4 py-2 text-white rounded font-bold text-sm flex items-center gap-2 shadow-lg transform transition active:scale-95 ${isGeneratingPdf ? 'bg-slate-400' : 'bg-red-600 hover:bg-red-700'}`}>
+                                    <Icon name="file-down" size={18}/> {isGeneratingPdf ? 'GENERANDO...' : 'DESCARGAR PDF'}
+                                </button>
+                            )}
+                        </div>
+
+                        {/* Vista Previa (Solo muestra la primera etiqueta para referencia visual) */}
+                        <div className="flex-grow overflow-y-auto p-4 lg:p-8 flex flex-col items-center">
+                            {packageLabels.length > 0 ? (
+                                <>
+                                    <div className="text-xs font-bold text-slate-400 mb-2 uppercase tracking-wide">VISTA PREVIA (1 de {packageLabels.length})</div>
+                                    <div className="preview-wrapper">
+                                        <ProductionLabel labelData={packageLabels[0]} shiftHours={shiftHours} repoUrl={repoUrl} />
+                                    </div>
+                                    <div className="text-center text-slate-500 text-sm max-w-md">
+                                        Esta es una vista previa. Al hacer clic en <b>Descargar PDF</b> se generarán todas las {packageLabels.length} etiquetas en formato 6"x4".
+                                    </div>
+                                </>
+                            ) : (
+                                <div className="flex flex-col items-center justify-center h-64 text-slate-400">
+                                    <Icon name="box" size={48} className="mb-2 opacity-50"/>
+                                    <p>Selecciona una orden del menú</p>
                                 </div>
                             )}
                         </div>
-                        <div className="flex-grow flex flex-col items-center p-4 lg:p-10 bg-slate-200 overflow-y-auto print-container">
-                            {packageLabels.length > 0 ? ( packageLabels.map((labelData, index) => ( <div key={index} className="label-wrapper"><ProductionLabel labelData={labelData} shiftHours={shiftHours} /></div> )) ) : ( <div className="text-center text-slate-400 mt-20">Selecciona una orden</div> )}
+                    </div>
+
+                    {/* CONTENEDOR OCULTO PARA GENERACIÓN DE PDF */}
+                    {/* Este div está fuera de la vista pero contiene TODAS las etiquetas con medidas fijas */}
+                    <div style={{position: 'absolute', top: 0, left: '-9999px', width: '6in'}}>
+                        <div ref={pdfContainerRef}>
+                            {packageLabels.map((labelData, index) => (
+                                <div key={index} className="pdf-fixed-container">
+                                    <ProductionLabel labelData={labelData} shiftHours={shiftHours} repoUrl={repoUrl} />
+                                </div>
+                            ))}
                         </div>
                     </div>
 
-                    <ScanTracker selectedOrder={selectedOrder} packageLabels={packageLabels} onOpenQuickScan={() => setShowScanner(true)} />
+                    {/* MODALES */}
+                    <div className="w-full lg:w-64 bg-white border-l border-slate-200 shadow-xl z-20 shrink-0 hidden lg:flex flex-col">
+                         <div className="p-4 bg-slate-50 border-b">
+                            <h3 className="font-bold text-slate-700 flex items-center gap-2"><Icon name="qr-code"/> Scanner</h3>
+                         </div>
+                         <div className="p-4 flex-grow flex flex-col items-center justify-center">
+                            <button onClick={() => setShowScanner(true)} className="w-full bg-blue-600 hover:bg-blue-700 text-white py-3 rounded-lg font-bold shadow-md flex flex-col items-center gap-2">
+                                <Icon name="camera" size={24}/> ABRIR ESCÁNER
+                            </button>
+                            <p className="text-xs text-center text-slate-400 mt-4">Escanea códigos para validar producción.</p>
+                         </div>
+                    </div>
+
+                    <RepoModal isVisible={showRepoModal} onClose={() => setShowRepoModal(false)} />
                     <QuickScannerModal isVisible={showScanner} onClose={() => setShowScanner(false)} allOrders={orders} onScanSaved={() => {}} />
                 </div>
             );
         };
+
         const root = ReactDOM.createRoot(document.getElementById('root'));
         root.render(<App />);
     </script>
