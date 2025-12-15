@@ -3,7 +3,7 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>Generador Cirineo v4.0 (PDF Fix + Imágenes)</title>
+    <title>Generador Cirineo v4.1 (Multi-Repo + Barcode Clean)</title>
     
     <link rel="icon" href="https://raw.githubusercontent.com/jesusvn1993mplvt3-ai/CIRINEO/refs/heads/main/icon.ico">
     
@@ -26,11 +26,9 @@
         body { background-color: #f1f5f9; min-height: 100vh; font-family: 'Roboto Condensed', sans-serif; overflow: hidden; }
         @media (max-width: 1024px) { body { height: auto; overflow-y: auto; overflow-x: hidden; } }
         
-        /* Ocultar elementos auxiliares */
         #reader a, #reader-hidden a { display: none !important; }
 
-        /* --- CLASES CRÍTICAS PARA EL PDF --- */
-        /* Este contenedor fuerza el tamaño exacto independientemente de la pantalla del dispositivo */
+        /* --- PDF FIXED CONTAINER --- */
         .pdf-fixed-container {
             width: 6in;
             height: 4in;
@@ -44,28 +42,26 @@
             display: flex;
         }
 
-        /* Contenedor principal para la vista previa en pantalla */
         .preview-wrapper {
             width: 100%;
-            max-width: 600px; /* Solo visual en pantalla */
+            max-width: 600px;
             aspect-ratio: 6/4;
             margin-bottom: 2rem;
             box-shadow: 0 4px 6px -1px rgba(0, 0, 0, 0.1);
             background: white;
         }
 
-        /* --- ESTRUCTURA DE LA ETIQUETA --- */
+        /* --- LABEL LAYOUT --- */
         .label-layout {
             width: 100%;
             height: 100%;
             display: flex;
-            border: 1px solid #ddd; /* Borde guia visual tenue */
-            padding: 0.25in; /* MARGEN SOLICITADO ALREDEDOR */
+            border: 1px solid #ddd;
+            padding: 0.25in; 
             box-sizing: border-box;
             background: white;
         }
 
-        /* COLUMNA IZQUIERDA: IMAGEN */
         .col-img {
             width: 25%;
             display: flex;
@@ -81,7 +77,6 @@
             object-fit: contain;
         }
 
-        /* COLUMNA CENTRO: DATOS */
         .col-data {
             width: 60%;
             display: flex;
@@ -89,7 +84,6 @@
             border-right: 2px solid #000;
         }
 
-        /* COLUMNA DERECHA: CODIGO BARRAS */
         .col-barcode {
             width: 15%;
             display: flex;
@@ -99,7 +93,6 @@
             position: relative;
         }
 
-        /* Estilos internos de las filas de datos */
         .lbl-row { display: flex; border-bottom: 2px solid #000; width: 100%; }
         .lbl-row:last-child { border-bottom: none; }
         .lbl-col { border-right: 2px solid #000; padding: 2px 4px; display: flex; flex-direction: column; justify-content: center; overflow: hidden; }
@@ -110,10 +103,6 @@
         .lbl-medium { font-family: 'Oswald', sans-serif; font-weight: 700; font-size: 20px; line-height: 1; color: #000; }
         .lbl-std { font-size: 14px; font-weight: 700; color: #000; line-height: 1.1; }
 
-        .loader { border: 4px solid #f3f3f3; border-top: 4px solid #3498db; border-radius: 50%; width: 30px; height: 30px; animation: spin 1s linear infinite; }
-        @keyframes spin { 0% { transform: rotate(0deg); } 100% { transform: rotate(360deg); } }
-
-        /* Ocultar scrollbar en impresión */
         .hide-scrollbar::-webkit-scrollbar { display: none; }
         .hide-scrollbar { -ms-overflow-style: none; scrollbar-width: none; }
     </style>
@@ -148,52 +137,84 @@
             return <div ref={containerRef} className="inline-block" style={{ width: size, height: size }}></div>;
         };
 
-        // --- MODAL DE REPOSITORIO ---
-        const RepoModal = ({ isVisible, onClose }) => {
-            const [url, setUrl] = useState('');
-            
+        // --- GESTOR DE REPOSITORIOS (DB) ---
+        const RepoManagerModal = ({ isVisible, onClose }) => {
+            const [repos, setRepos] = useState([]);
+            const [newUrl, setNewUrl] = useState('');
+            const [loading, setLoading] = useState(false);
+
             useEffect(() => {
-                const saved = localStorage.getItem('cirineo_img_repo');
-                if(saved) setUrl(saved);
+                if(!isVisible) return;
+                const unsub = db.collection('config_repos').orderBy('createdAt', 'desc').onSnapshot(snap => {
+                    setRepos(snap.docs.map(d => ({id: d.id, ...d.data()})));
+                });
+                return () => unsub();
             }, [isVisible]);
 
-            const handleSave = () => {
-                let cleanUrl = url.trim();
-                // Eliminar slash final si existe
+            const addRepo = async () => {
+                if(!newUrl.trim()) return;
+                setLoading(true);
+                let cleanUrl = newUrl.trim();
                 if(cleanUrl.endsWith('/')) cleanUrl = cleanUrl.slice(0, -1);
-                localStorage.setItem('cirineo_img_repo', cleanUrl);
-                alert('Repositorio guardado correctamente.');
-                onClose();
+
+                try {
+                    await db.collection('config_repos').add({
+                        url: cleanUrl,
+                        createdAt: FieldValue.serverTimestamp()
+                    });
+                    setNewUrl('');
+                } catch(e) { alert("Error al guardar: " + e.message); }
+                setLoading(false);
+            };
+
+            const deleteRepo = async (id) => {
+                if(confirm("¿Eliminar este repositorio?")) {
+                    await db.collection('config_repos').doc(id).delete();
+                }
             };
 
             if(!isVisible) return null;
 
             return (
                 <div className="fixed inset-0 bg-black/80 z-[100] flex items-center justify-center p-4">
-                    <div className="bg-white rounded-lg shadow-xl w-full max-w-md overflow-hidden">
-                        <div className="bg-slate-800 text-white p-3 font-bold flex justify-between items-center">
-                            <span>CONFIGURAR IMÁGENES</span>
+                    <div className="bg-white rounded-lg shadow-xl w-full max-w-md overflow-hidden flex flex-col max-h-[80vh]">
+                        <div className="bg-slate-800 text-white p-3 font-bold flex justify-between items-center shrink-0">
+                            <span>FUENTES DE IMÁGENES</span>
                             <button onClick={onClose}><Icon name="x"/></button>
                         </div>
-                        <div className="p-4">
-                            <label className="block text-sm font-bold text-slate-700 mb-2">URL del Repositorio (Carpeta):</label>
-                            <input 
-                                type="text" 
-                                value={url} 
-                                onChange={e => setUrl(e.target.value)}
-                                placeholder="https://raw.githubusercontent.com/usuario/repo/main/imagenes"
-                                className="w-full border border-slate-300 rounded p-2 text-sm mb-2"
-                            />
-                            <p className="text-xs text-slate-500 mb-4">El sistema buscará automáticamente: <code>URL/MODELO.jpg</code></p>
-                            <button onClick={handleSave} className="w-full bg-blue-600 text-white font-bold py-2 rounded hover:bg-blue-700">GUARDAR</button>
+                        <div className="p-4 flex-grow overflow-y-auto">
+                            <div className="flex gap-2 mb-4">
+                                <input 
+                                    type="text" 
+                                    value={newUrl} 
+                                    onChange={e => setNewUrl(e.target.value)}
+                                    placeholder="Pegar URL del repositorio..."
+                                    className="flex-grow border border-slate-300 rounded p-2 text-sm"
+                                />
+                                <button onClick={addRepo} disabled={loading} className="bg-blue-600 text-white px-3 rounded font-bold hover:bg-blue-700">+</button>
+                            </div>
+                            
+                            <h4 className="text-xs font-bold text-slate-500 mb-2 uppercase">Repositorios Activos:</h4>
+                            {repos.length === 0 && <p className="text-sm text-slate-400 italic">No hay repositorios configurados.</p>}
+                            <ul className="space-y-2">
+                                {repos.map(repo => (
+                                    <li key={repo.id} className="bg-slate-50 p-2 rounded border flex justify-between items-center text-xs">
+                                        <span className="truncate max-w-[85%] font-mono text-slate-600" title={repo.url}>{repo.url}</span>
+                                        <button onClick={() => deleteRepo(repo.id)} className="text-red-500 hover:text-red-700 font-bold">X</button>
+                                    </li>
+                                ))}
+                            </ul>
+                            <div className="mt-4 text-[10px] text-slate-400 bg-yellow-50 p-2 rounded border border-yellow-200">
+                                <p><strong>Nota:</strong> El sistema buscará la imagen en el primer repositorio. Si no la encuentra, intentará en el segundo, y así sucesivamente.</p>
+                            </div>
                         </div>
                     </div>
                 </div>
             );
         };
 
-        // --- COMPONENTE DE ETIQUETA ---
-        const ProductionLabel = ({ labelData, shiftHours, repoUrl }) => {
+        // --- ETIQUETA ---
+        const ProductionLabel = ({ labelData, shiftHours, repos }) => {
             const svgRef = useRef(null);
             const order = labelData; 
             const subPiece = order.subPiecesData ? order.subPiecesData.find(sp => sp.pieza === order.piezaNombre) : (order.subPiecesData?.[0] || {});
@@ -207,35 +228,58 @@
             const pzas1hr = tiempo > 0 ? (60 / tiempo).toFixed(1) : '-'; 
             const pzasShift = tiempo > 0 ? ((hours * 60) / tiempo).toFixed(1) : '-'; 
 
-            // Gestión de Imagen
+            // --- LOGICA DE IMAGEN EN CASCADA ---
             const [imgSrc, setImgSrc] = useState(null);
-            
-            useEffect(() => {
-                if(repoUrl && order.codigo) {
-                    // Intenta cargar jpg primero, el onerror manejará png o fallback
-                    setImgSrc(`${repoUrl}/${order.codigo}.jpg`);
-                }
-            }, [repoUrl, order.codigo]);
+            const [currentRepoIndex, setCurrentRepoIndex] = useState(0);
+            const [tryPng, setTryPng] = useState(false); // false = jpg, true = png
 
-            const handleImgError = (e) => {
-                if(e.target.src.endsWith('.jpg')) {
-                    e.target.src = `${repoUrl}/${order.codigo}.png`;
+            // Reiniciar busqueda cuando cambia el codigo o la lista de repos
+            useEffect(() => {
+                setImgSrc(null);
+                setCurrentRepoIndex(0);
+                setTryPng(false);
+                if (repos && repos.length > 0 && order.codigo) {
+                   attemptLoad(0, false);
+                }
+            }, [order.codigo, repos]);
+
+            const attemptLoad = (repoIdx, isPng) => {
+                if (repoIdx >= repos.length) return; // Se acabaron los repos
+                const ext = isPng ? '.png' : '.jpg';
+                const url = `${repos[repoIdx].url}/${order.codigo}${ext}`;
+                setImgSrc(url);
+            };
+
+            const handleImgError = () => {
+                // Falló la carga actual. Decidir siguiente paso.
+                if (!tryPng) {
+                    // Si falló JPG, intentar PNG en el MISMO repo
+                    setTryPng(true);
+                    attemptLoad(currentRepoIndex, true);
                 } else {
-                    e.target.style.display = 'none'; // Si falla png tambien, ocultar
+                    // Si falló PNG, pasar al SIGUIENTE repo y volver a JPG
+                    const nextRepo = currentRepoIndex + 1;
+                    if (nextRepo < repos.length) {
+                        setCurrentRepoIndex(nextRepo);
+                        setTryPng(false);
+                        attemptLoad(nextRepo, false);
+                    } else {
+                        // Se acabaron todas las opciones
+                        setImgSrc(null); 
+                    }
                 }
             };
 
-            // Barcode
+            // --- BARCODE ---
             useEffect(() => {
                 if (svgRef.current && barcodeValue) {
                     try {
-                        // displayValue: false para que sea limpio
                         JsBarcode(svgRef.current, barcodeValue, { 
                             format: "CODE128", 
                             lineColor: "#000", 
-                            width: 2, 
-                            height: 80, 
-                            displayValue: false, 
+                            width: 1.6, // Ancho de barra un poco menor para que quepa bien
+                            height: 60, // Altura reducida (aprox 80% visual en contenedor)
+                            displayValue: false, // SIN TEXTO
                             margin: 0 
                         });
                     } catch (e) { console.error("Error barcode", e); }
@@ -244,22 +288,17 @@
 
             return (
                 <div className="label-layout">
-                    {/* ZONA 1: IMAGEN (IZQUIERDA) */}
+                    {/* ZONA 1: IMAGEN */}
                     <div className="col-img">
                         {imgSrc ? (
-                            <img 
-                                src={imgSrc} 
-                                onError={handleImgError} 
-                                alt={order.codigo}
-                            />
+                            <img src={imgSrc} onError={handleImgError} alt={order.codigo} />
                         ) : (
                             <div className="text-slate-300 text-xs text-center font-bold">SIN<br/>IMAGEN</div>
                         )}
                     </div>
 
-                    {/* ZONA 2: DATOS (CENTRO) */}
+                    {/* ZONA 2: DATOS */}
                     <div className="col-data">
-                        {/* Cabecera: Modelo y Total */}
                         <div className="lbl-row" style={{height: '18%'}}>
                             <div className="lbl-col" style={{width: '65%'}}>
                                 <div className="lbl-title">MODELO</div>
@@ -271,7 +310,6 @@
                             </div>
                         </div>
                         
-                        {/* Cliente y Partida */}
                         <div className="lbl-row" style={{height: '14%'}}>
                             <div className="lbl-col" style={{width: '70%'}}>
                                 <div className="lbl-title">CLIENTE</div>
@@ -283,7 +321,6 @@
                             </div>
                         </div>
 
-                        {/* Descripción de pieza */}
                         <div className="lbl-row" style={{height: '12%', alignItems: 'center', backgroundColor: '#f8fafc'}}>
                             <div className="lbl-col" style={{width: '100%', flexDirection: 'row', gap: '5px', border: 'none'}}>
                                 <span className="lbl-title">PIEZA:</span>
@@ -291,7 +328,6 @@
                             </div>
                         </div>
 
-                        {/* Métricas Principales */}
                         <div className="lbl-row" style={{height: '24%'}}>
                             <div className="lbl-col" style={{width: '33%', textAlign: 'center'}}>
                                 <div className="lbl-title">PAQUETE</div>
@@ -307,7 +343,6 @@
                             </div>
                         </div>
 
-                        {/* Detalles Técnicos */}
                         <div className="lbl-row" style={{flexGrow: 1}}>
                             <div className="lbl-col" style={{width: '25%'}}>
                                 <div className="lbl-title">TALLA</div>
@@ -326,7 +361,6 @@
                                 <div className="lbl-std" style={{fontSize: '18px'}}>{pzasShift}</div>
                             </div>
                         </div>
-                         {/* Footer Pequeño */}
                         <div className="lbl-row" style={{height: '15px', borderBottom: 'none'}}>
                             <div style={{fontSize: '9px', width: '100%', textAlign: 'center', fontWeight: 'bold'}}>
                                 ENTREGA: {fechaEntrega}
@@ -334,20 +368,19 @@
                         </div>
                     </div>
 
-                    {/* ZONA 3: BARCODE (DERECHA - LADO ANGOSTO) */}
+                    {/* ZONA 3: BARCODE (LIMPIO Y AJUSTADO) */}
                     <div className="col-barcode">
-                        {/* Contenedor rotado 90 grados para usar el alto como ancho */}
                         <div style={{
                             transform: 'rotate(90deg)', 
                             transformOrigin: 'center', 
-                            width: '3.5in', /* El alto de la etiqueta es 4in, usamos espacio seguro */
+                            width: '3.5in', 
                             display: 'flex',
-                            flexDirection: 'column',
                             alignItems: 'center',
-                            justifyContent: 'center'
+                            justifyContent: 'center',
+                            overflow: 'hidden' 
                         }}>
-                             <svg ref={svgRef} style={{width: '100%', height: 'auto'}}></svg>
-                             <div style={{fontSize: '10px', fontFamily: 'monospace', marginTop: '5px'}}>{barcodeValue}</div>
+                             {/* SVG renderizado por JsBarcode sin texto y tamaño controlado */}
+                             <svg ref={svgRef} style={{maxWidth: '100%', maxHeight: '100%'}}></svg>
                         </div>
                     </div>
                 </div>
@@ -393,27 +426,22 @@
             const handleQuickScan = (rawCode) => {
                 if (!rawCode) return;
                 const scannedCode = rawCode.trim();
-
                 if (scans.includes(scannedCode)) {
                     setScanStatus({ message: `Código ${scannedCode} ya escaneado.`, type: 'warning' });
                     return;
                 }
-
                 let foundPackage = null;
                 let foundOrder = null;
-
                 for (const order of allOrders) {
                     if (order.progreso) {
                         const pkg = order.progreso.find(p => p.codigoUnico === scannedCode);
                         if (pkg) { foundPackage = pkg; foundOrder = order; break; }
                     }
                 }
-
                 if (!foundPackage || !foundOrder) {
                     setScanStatus({ message: `Código ${scannedCode} NO encontrado.`, type: 'error' });
                     return;
                 }
-
                 setScans(prev => [...prev, scannedCode]);
                 setScanStatus({ message: `¡OK! ${foundPackage.piezaNombre} (${foundPackage.paqueteNum})`, type: 'success' });
             };
@@ -421,7 +449,6 @@
             const handleSaveAll = async () => {
                 if (scans.length === 0 || isSaving) return;
                 setIsSaving(true);
-                const successfulScans = [];
                 const failedScans = [];
 
                 for (const scannedCode of scans) {
@@ -452,7 +479,6 @@
                             paquete_total: foundPackage.paquetesDePieza,
                             piezas_en_paquete: foundPackage.cantidad
                         });
-                        successfulScans.push(scannedCode);
                     } catch (error) { failedScans.push(scannedCode); }
                 }
                 setIsSaving(false);
@@ -498,22 +524,26 @@
             const [showRepoModal, setShowRepoModal] = useState(false);
             const [isGeneratingPdf, setIsGeneratingPdf] = useState(false); 
             const [shiftHours, setShiftHours] = useState(12);
-            const [repoUrl, setRepoUrl] = useState('');
+            
+            // Repositorios desde DB
+            const [repos, setRepos] = useState([]);
 
-            // Ref para el contenedor oculto de PDF
             const pdfContainerRef = useRef(null);
 
             useEffect(() => {
-                const savedRepo = localStorage.getItem('cirineo_img_repo');
-                if(savedRepo) setRepoUrl(savedRepo);
+                // Cargar repositorios al iniciar
+                const unsubRepos = db.collection('config_repos').orderBy('createdAt', 'desc').onSnapshot(snap => {
+                    const loaded = snap.docs.map(d => ({id: d.id, ...d.data()}));
+                    setRepos(loaded);
+                });
 
-                const unsubscribe = db.collection('orders').where('status', '!=', 'ARCHIVADO').onSnapshot(snapshot => {
-                        const fetchedOrders = snapshot.docs.map(doc => doc.data());
-                        fetchedOrders.sort((a, b) => b.id - a.id);
-                        setOrders(fetchedOrders);
-                    });
-                return () => unsubscribe();
-            }, [showRepoModal]);
+                const unsubOrders = db.collection('orders').where('status', '!=', 'ARCHIVADO').onSnapshot(snapshot => {
+                    const fetchedOrders = snapshot.docs.map(doc => doc.data());
+                    fetchedOrders.sort((a, b) => b.id - a.id);
+                    setOrders(fetchedOrders);
+                });
+                return () => { unsubRepos(); unsubOrders(); };
+            }, []);
             
             useEffect(() => {
                 if (selectedOrder && selectedOrder.progreso) {
@@ -536,40 +566,29 @@
                 return orders.filter(o => (o.codigo && o.codigo.includes(txt)) || (o.cliente && o.cliente.includes(txt)));
             }, [orders, filterText]);
 
-            // === LÓGICA DE PDF MEJORADA ===
             const handleDownloadPDF = async () => {
                 if (packageLabels.length === 0) return;
                 setIsGeneratingPdf(true);
-
-                // Esperar un momento para que React renderice el contenedor oculto si hubo cambios
                 await new Promise(resolve => setTimeout(resolve, 500));
                 
                 const element = pdfContainerRef.current;
                 if(!element) {
-                    alert("Error interno: Contenedor PDF no encontrado.");
+                    alert("Error interno PDF");
                     setIsGeneratingPdf(false);
                     return;
                 }
 
                 const opt = {
-                    margin:       [0, 0], // Margen 0 porque ya dimos padding en CSS
-                    filename:     `${selectedOrder.codigo || 'orden'}_${packageLabels.length}pqts.pdf`,
-                    image:        { type: 'jpeg', quality: 1.0 },
-                    html2canvas:  { 
-                        scale: 2, // Mejor calidad
-                        useCORS: true, 
-                        logging: false,
-                        windowWidth: 1200 // Simular pantalla grande para evitar layout movil
-                    },
-                    jsPDF:        { unit: 'in', format: [6, 4], orientation: 'landscape' }
+                    margin: [0, 0],
+                    filename: `${selectedOrder.codigo || 'orden'}_${packageLabels.length}pqts.pdf`,
+                    image: { type: 'jpeg', quality: 1.0 },
+                    html2canvas: { scale: 2, useCORS: true, logging: false, windowWidth: 1200 },
+                    jsPDF: { unit: 'in', format: [6, 4], orientation: 'landscape' }
                 };
 
-                html2pdf().set(opt).from(element).save().then(() => {
+                html2pdf().set(opt).from(element).save().then(() => setIsGeneratingPdf(false)).catch(err => {
+                    console.error(err);
                     setIsGeneratingPdf(false);
-                }).catch(err => {
-                    console.error("PDF Error:", err);
-                    setIsGeneratingPdf(false);
-                    alert("Error al generar PDF.");
                 });
             };
 
@@ -578,7 +597,7 @@
                     {/* SIDEBAR */}
                     <div className="w-full lg:w-72 bg-slate-800 text-white flex flex-col border-r border-slate-700 shadow-xl shrink-0 h-64 lg:h-auto">
                         <div className="p-4 bg-slate-900 border-b border-slate-700">
-                            <h1 className="text-xl font-bold text-yellow-400 tracking-tighter">CIRINEO v4.0</h1>
+                            <h1 className="text-xl font-bold text-yellow-400 tracking-tighter">CIRINEO v4.1</h1>
                             <input type="text" placeholder="Buscar orden..." value={filterText} onChange={e => setFilterText(e.target.value)} className="w-full mt-2 bg-slate-800 border border-slate-600 rounded p-2 text-sm" />
                             
                             <div className="mt-4 grid grid-cols-2 gap-2">
@@ -606,7 +625,6 @@
 
                     {/* MAIN CONTENT */}
                     <div className="flex-grow bg-slate-100 flex flex-col relative overflow-hidden">
-                        {/* Header */}
                         <div className="bg-white p-3 shadow-sm border-b flex justify-between items-center z-10">
                             <h2 className="font-bold text-slate-700 text-lg truncate">
                                 {selectedOrder ? `${selectedOrder.codigo} - ${packageLabels.length} PAQUETES` : 'Seleccione una orden'}
@@ -618,16 +636,17 @@
                             )}
                         </div>
 
-                        {/* Vista Previa (Solo muestra la primera etiqueta para referencia visual) */}
+                        {/* PREVIEW */}
                         <div className="flex-grow overflow-y-auto p-4 lg:p-8 flex flex-col items-center">
                             {packageLabels.length > 0 ? (
                                 <>
                                     <div className="text-xs font-bold text-slate-400 mb-2 uppercase tracking-wide">VISTA PREVIA (1 de {packageLabels.length})</div>
                                     <div className="preview-wrapper">
-                                        <ProductionLabel labelData={packageLabels[0]} shiftHours={shiftHours} repoUrl={repoUrl} />
+                                        {/* Pasamos 'repos' a la etiqueta para que busque la imagen */}
+                                        <ProductionLabel labelData={packageLabels[0]} shiftHours={shiftHours} repos={repos} />
                                     </div>
                                     <div className="text-center text-slate-500 text-sm max-w-md">
-                                        Esta es una vista previa. Al hacer clic en <b>Descargar PDF</b> se generarán todas las {packageLabels.length} etiquetas en formato 6"x4".
+                                        Nota: El código de barras no muestra texto numérico y está ajustado al 80% de altura.
                                     </div>
                                 </>
                             ) : (
@@ -639,13 +658,12 @@
                         </div>
                     </div>
 
-                    {/* CONTENEDOR OCULTO PARA GENERACIÓN DE PDF */}
-                    {/* Este div está fuera de la vista pero contiene TODAS las etiquetas con medidas fijas */}
+                    {/* PDF GENERATION CONTAINER (HIDDEN) */}
                     <div style={{position: 'absolute', top: 0, left: '-9999px', width: '6in'}}>
                         <div ref={pdfContainerRef}>
                             {packageLabels.map((labelData, index) => (
                                 <div key={index} className="pdf-fixed-container">
-                                    <ProductionLabel labelData={labelData} shiftHours={shiftHours} repoUrl={repoUrl} />
+                                    <ProductionLabel labelData={labelData} shiftHours={shiftHours} repos={repos} />
                                 </div>
                             ))}
                         </div>
@@ -660,11 +678,10 @@
                             <button onClick={() => setShowScanner(true)} className="w-full bg-blue-600 hover:bg-blue-700 text-white py-3 rounded-lg font-bold shadow-md flex flex-col items-center gap-2">
                                 <Icon name="camera" size={24}/> ABRIR ESCÁNER
                             </button>
-                            <p className="text-xs text-center text-slate-400 mt-4">Escanea códigos para validar producción.</p>
                          </div>
                     </div>
 
-                    <RepoModal isVisible={showRepoModal} onClose={() => setShowRepoModal(false)} />
+                    <RepoManagerModal isVisible={showRepoModal} onClose={() => setShowRepoModal(false)} />
                     <QuickScannerModal isVisible={showScanner} onClose={() => setShowScanner(false)} allOrders={orders} onScanSaved={() => {}} />
                 </div>
             );
