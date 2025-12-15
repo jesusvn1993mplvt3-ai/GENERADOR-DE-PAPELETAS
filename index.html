@@ -3,7 +3,7 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>Generador Cirineo v4.1 (Multi-Repo + Barcode Clean)</title>
+    <title>Generador Cirineo v4.2 (Barcode X2)</title>
     
     <link rel="icon" href="https://raw.githubusercontent.com/jesusvn1993mplvt3-ai/CIRINEO/refs/heads/main/icon.ico">
     
@@ -251,20 +251,16 @@
             };
 
             const handleImgError = () => {
-                // Falló la carga actual. Decidir siguiente paso.
                 if (!tryPng) {
-                    // Si falló JPG, intentar PNG en el MISMO repo
                     setTryPng(true);
                     attemptLoad(currentRepoIndex, true);
                 } else {
-                    // Si falló PNG, pasar al SIGUIENTE repo y volver a JPG
                     const nextRepo = currentRepoIndex + 1;
                     if (nextRepo < repos.length) {
                         setCurrentRepoIndex(nextRepo);
                         setTryPng(false);
                         attemptLoad(nextRepo, false);
                     } else {
-                        // Se acabaron todas las opciones
                         setImgSrc(null); 
                     }
                 }
@@ -277,9 +273,9 @@
                         JsBarcode(svgRef.current, barcodeValue, { 
                             format: "CODE128", 
                             lineColor: "#000", 
-                            width: 1.6, // Ancho de barra un poco menor para que quepa bien
-                            height: 60, // Altura reducida (aprox 80% visual en contenedor)
-                            displayValue: false, // SIN TEXTO
+                            width: 3,   // <--- ANTES 1.6, AHORA 3 (MÁS GRUESO)
+                            height: 120, // <--- ANTES 60, AHORA 120 (MÁS ALTO)
+                            displayValue: false, 
                             margin: 0 
                         });
                     } catch (e) { console.error("Error barcode", e); }
@@ -368,7 +364,7 @@
                         </div>
                     </div>
 
-                    {/* ZONA 3: BARCODE (LIMPIO Y AJUSTADO) */}
+                    {/* ZONA 3: BARCODE (DOBLE TAMAÑO) */}
                     <div className="col-barcode">
                         <div style={{
                             transform: 'rotate(90deg)', 
@@ -379,7 +375,6 @@
                             justifyContent: 'center',
                             overflow: 'hidden' 
                         }}>
-                             {/* SVG renderizado por JsBarcode sin texto y tamaño controlado */}
                              <svg ref={svgRef} style={{maxWidth: '100%', maxHeight: '100%'}}></svg>
                         </div>
                     </div>
@@ -597,7 +592,7 @@
                     {/* SIDEBAR */}
                     <div className="w-full lg:w-72 bg-slate-800 text-white flex flex-col border-r border-slate-700 shadow-xl shrink-0 h-64 lg:h-auto">
                         <div className="p-4 bg-slate-900 border-b border-slate-700">
-                            <h1 className="text-xl font-bold text-yellow-400 tracking-tighter">CIRINEO v4.1</h1>
+                            <h1 className="text-xl font-bold text-yellow-400 tracking-tighter">CIRINEO v4.2</h1>
                             <input type="text" placeholder="Buscar orden..." value={filterText} onChange={e => setFilterText(e.target.value)} className="w-full mt-2 bg-slate-800 border border-slate-600 rounded p-2 text-sm" />
                             
                             <div className="mt-4 grid grid-cols-2 gap-2">
@@ -646,7 +641,7 @@
                                         <ProductionLabel labelData={packageLabels[0]} shiftHours={shiftHours} repos={repos} />
                                     </div>
                                     <div className="text-center text-slate-500 text-sm max-w-md">
-                                        Nota: El código de barras no muestra texto numérico y está ajustado al 80% de altura.
+                                        Nota: El código de barras se ha agrandado al doble (ancho 3, alto 120) para mayor legibilidad.
                                     </div>
                                 </>
                             ) : (
