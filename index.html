@@ -3,7 +3,7 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>Generador de Papeletas - Cirineo v3.5 (PDF Fix)</title>
+    <title>Generador de Papeletas - Cirineo v3.5 (PZAS/HR Final)</title>
     
     <link rel="icon" href="https://raw.githubusercontent.com/jesusvn1993mplvt3-ai/CIRINEO/refs/heads/main/icon.ico">
     
@@ -125,18 +125,30 @@
             return <div ref={containerRef} className="inline-block" style={{ width: size, height: size }}></div>;
         };
 
-        const ProductionLabel = ({ labelData }) => {
+        const ProductionLabel = ({ labelData, shiftHours }) => {
             const svgRef = useRef(null);
             const order = labelData; 
             const subPiece = order.subPiecesData ? order.subPiecesData.find(sp => sp.pieza === order.piezaNombre) : (order.subPiecesData?.[0] || {});
             
-            const materialNylon = order.threading ? order.threading.find(t => t.material && t.material.toUpperCase().includes('NYLON')) : null;
-            const materialLycra = order.threading ? order.threading.find(t => t.material && t.material.toUpperCase().includes('LYCRA')) : null;
-            const lycraText = materialLycra ? materialLycra.material.replace(/LYCRA/i, '').trim() : (order.threading && order.threading[1] ? order.threading[1].material : 'N/A');
-            const nylonText = materialNylon ? materialNylon.material.replace(/NYLON/i, '').trim() : (order.threading && order.threading[0] ? order.threading[0].material : 'N/A');
+            // Los datos de Nylon y Lycra ya no son necesarios en el render, pero se mantienen por si la estructura de datos lo requiere.
+            // const materialNylon = order.threading ? order.threading.find(t => t.material && t.material.toUpperCase().includes('NYLON')) : null;
+            // const materialLycra = order.threading ? order.threading.find(t => t.material && t.material.toUpperCase().includes('LYCRA')) : null;
+            // const lycraText = materialLycra ? materialLycra.material.replace(/LYCRA/i, '').trim() : (order.threading && order.threading[1] ? order.threading[1].material : 'N/A');
+            // const nylonText = materialNylon ? materialNylon.material.replace(/NYLON/i, '').trim() : (order.threading && order.threading[0] ? order.threading[0].material : 'N/A');
             
             const barcodeValue = order.packageCode; 
             const fechaEntrega = order.fechaEntrega || new Date(Date.now() + 7 * 24 * 60 * 60 * 1000).toLocaleDateString('es-MX');
+
+            // --- Cálculos de Rendimiento (MODIFICADOS) ---
+            const tiempo = parseFloat(subPiece?.tiempo);
+            const hours = parseFloat(shiftHours) || 12; // Usar prop o 12 por defecto
+            
+            // Pzas / 1 Hr = 60 minutos / tiempo por pieza
+            const pzas1hr = tiempo > 0 ? (60 / tiempo).toFixed(1) : '---'; 
+            
+            // Pzas / Turno = (Horas de turno * 60 minutos) / tiempo por pieza
+            const pzasShift = tiempo > 0 ? ((hours * 60) / tiempo).toFixed(1) : '---'; 
+            // ------------------------------------
 
             useEffect(() => {
                 if (svgRef.current && barcodeValue) {
@@ -182,14 +194,22 @@
                         </div>
                     </div>
                     <div className="lbl-row row-details">
-                        <div style={{width: '50%', display: 'flex', flexDirection: 'column', borderRight: '2px solid black'}}>
-                            <div style={{flex: 1, display: 'flex', alignItems: 'center', borderBottom: '1px solid black', padding: '0 5px'}}>
-                                <span className="lbl-title" style={{width: '50px'}}>NYLON</span><span className="lbl-small truncate" style={{fontSize: '14px'}} title={nylonText}>{nylonText.substring(0, 18)}</span>
+                        
+                        {/* IZQUIERDA: Pzas/Hr y Pzas/Turno (Lado a lado) */}
+                        <div style={{width: '50%', display: 'flex', borderRight: '2px solid black'}}> 
+                            {/* Pzas / 1 Hr */}
+                            <div className="lbl-col" style={{flex: 1, padding: '2px', textAlign: 'center', borderRight: '1px solid black'}}>
+                                <div className="lbl-title" style={{fontSize: '14px', marginBottom: '4px'}}>PZAS / 1 HR</div>
+                                <div className="lbl-big" style={{fontSize: '32px', lineHeight: '1'}}>{pzas1hr}</div>
                             </div>
-                            <div style={{flex: 1, display: 'flex', alignItems: 'center', padding: '0 5px'}}>
-                                <span className="lbl-title" style={{width: '50px'}}>LYCRA</span><span className="lbl-small truncate" style={{fontSize: '14px'}} title={lycraText}>{lycraText.substring(0, 18)}</span>
+                            {/* Pzas / X Hrs (Shift) */}
+                            <div className="lbl-col" style={{flex: 1, padding: '2px', textAlign: 'center', borderRight: 'none'}}> 
+                                <div className="lbl-title" style={{fontSize: '14px', marginBottom: '4px'}}>PZAS / {hours} HRS</div> {/* Título Dinámico */}
+                                <div className="lbl-big" style={{fontSize: '32px', lineHeight: '1'}}>{pzasShift}</div>
                             </div>
                         </div>
+                        
+                        {/* DERECHA: Talla, Peso (g), Tiempo (min) (Original) */}
                         <div style={{width: '50%', display: 'grid', gridTemplateColumns: '1fr 1fr', gridTemplateRows: '1fr 1fr'}}>
                             <div className="lbl-col" style={{borderBottom: '1px solid black', borderRight: '1px solid black', padding: '2px'}}>
                                 <div className="lbl-title">TALLA</div><div className="lbl-medium" style={{fontSize: '20px'}}>{subPiece?.talla || 'UNI'}</div>
@@ -427,7 +447,8 @@
             const [packageLabels, setPackageLabels] = useState([]); 
             const [filterText, setFilterText] = useState('');
             const [showScanner, setShowScanner] = useState(false);
-            const [isGeneratingPdf, setIsGeneratingPdf] = useState(false); // Estado de carga para el PDF
+            const [isGeneratingPdf, setIsGeneratingPdf] = useState(false); 
+            const [shiftHours, setShiftHours] = useState(12); // Nuevo estado para las horas de turno
 
             const generatePackageLabels = (order) => {
                 if (order.progreso && order.progreso.length > 0) {
@@ -470,23 +491,19 @@
                 if (packageLabels.length === 0) return;
                 setIsGeneratingPdf(true);
                 
-                // 1. Seleccionamos el contenedor que tiene todas las etiquetas
                 const element = document.querySelector('.print-container');
                 
-                // 2. Opciones especificas para 6x4 pulgadas
                 const opt = {
                     margin:       0,
                     filename:     `${selectedOrder.codigo || 'orden'}_${packageLabels.length}pqts.pdf`,
                     image:        { type: 'jpeg', quality: 0.98 },
                     html2canvas:  { scale: 2, useCORS: true, logging: false, backgroundColor: '#ffffff' }, 
-                    jsPDF:        { unit: 'in', format: [6, 4], orientation: 'landscape' } // Dimensiones exactas
+                    jsPDF:        { unit: 'in', format: [6, 4], orientation: 'landscape' } 
                 };
 
-                // 3. Añadir clase temporal para que html2pdf ignore los margenes/sombras de la vista de pantalla
                 element.classList.add('pdf-mode');
 
                 html2pdf().set(opt).from(element).save().then(() => {
-                    // 4. Limpieza
                     element.classList.remove('pdf-mode');
                     setIsGeneratingPdf(false);
                 }).catch(err => {
@@ -503,6 +520,18 @@
                         <div className="p-4 bg-slate-900 border-b border-slate-700">
                             <h1 className="text-xl font-bold text-yellow-400">PAPELETAS</h1>
                             <input type="text" placeholder="Buscar..." value={filterText} onChange={e => setFilterText(e.target.value)} className="w-full mt-2 bg-slate-800 border border-slate-600 rounded p-2 text-sm" />
+                            {/* NUEVO INPUT PARA HORAS DE TURNO */}
+                            <div className="mt-4">
+                                <label className="text-xs font-semibold text-slate-300">Horas de Turno (Pzas/Turno):</label>
+                                <input 
+                                    type="number" 
+                                    value={shiftHours} 
+                                    onChange={e => setShiftHours(e.target.value)} 
+                                    min="1" 
+                                    max="24" 
+                                    className="w-full mt-1 bg-slate-800 border border-slate-600 rounded p-2 text-sm text-yellow-400 font-bold" 
+                                />
+                            </div>
                         </div>
                         <div className="flex-grow overflow-y-auto p-2 space-y-2">
                             {filteredOrders.map(order => (
@@ -529,7 +558,7 @@
                             )}
                         </div>
                         <div className="flex-grow flex flex-col items-center p-4 lg:p-10 bg-slate-200 overflow-y-auto print-container">
-                            {packageLabels.length > 0 ? ( packageLabels.map((labelData, index) => ( <div key={index} className="label-wrapper"><ProductionLabel labelData={labelData} /></div> )) ) : ( <div className="text-center text-slate-400 mt-20">Selecciona una orden</div> )}
+                            {packageLabels.length > 0 ? ( packageLabels.map((labelData, index) => ( <div key={index} className="label-wrapper"><ProductionLabel labelData={labelData} shiftHours={shiftHours} /></div> )) ) : ( <div className="text-center text-slate-400 mt-20">Selecciona una orden</div> )}
                         </div>
                     </div>
 
