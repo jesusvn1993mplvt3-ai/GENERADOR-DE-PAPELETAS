@@ -3,7 +3,7 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>Generador Cirineo v5.2 (Pieza Corta + Maq Black)</title>
+    <title>Generador Cirineo v5.3 (Texto Centrado Puro)</title>
     
     <link rel="icon" href="https://raw.githubusercontent.com/jesusvn1993mplvt3-ai/CIRINEO/refs/heads/main/icon.ico">
     
@@ -220,11 +220,11 @@
             // --- LÓGICA DE TAMAÑO DE FUENTE PARA "PIEZA" ---
             let piezaFontSize = '28px';
             if (piezaVisual.length <= 6) {
-                piezaFontSize = '60px'; // Aún más grande pues el texto es corto
+                piezaFontSize = '64px'; // Gigante para palabras cortas
             } else if (piezaVisual.length <= 10) {
-                piezaFontSize = '48px';
+                piezaFontSize = '52px';
             } else {
-                piezaFontSize = '34px';
+                piezaFontSize = '38px';
             }
 
             // Gestión de Imagen Inteligente
@@ -310,27 +310,26 @@
                             </div>
                         </div>
 
-                        {/* Fila 3: PIEZA LIMPIA (SOLO PRIMER PALABRA) */}
+                        {/* Fila 3: PIEZA LIMPIA Y CENTRADA (SIN TEXTO "PIEZA") */}
                         <div className="lbl-row" style={{height: '24%', backgroundColor: '#000', color: '#FFF'}}>
                             <div className="lbl-col" style={{
                                 width: '100%', 
                                 border: 'none', 
                                 alignItems: 'center', 
                                 justifyContent: 'center',
-                                padding: '0 5px'
+                                padding: '0',
+                                display: 'flex' 
                             }}>
-                                <span style={{fontSize: '9px', textTransform: 'uppercase', color: '#aaa', fontWeight: 'bold', lineHeight: '1'}}>PIEZA</span>
                                 <span style={{
                                     fontFamily: "'Oswald', sans-serif",
                                     fontWeight: '700',
                                     fontSize: piezaFontSize, 
-                                    lineHeight: '0.9',
+                                    lineHeight: '1',
                                     textAlign: 'center',
                                     width: '100%',
                                     whiteSpace: 'nowrap',
                                     overflow: 'hidden',
-                                    textOverflow: 'ellipsis',
-                                    marginTop: '2px'
+                                    textOverflow: 'ellipsis'
                                 }}>{piezaVisual}</span>
                             </div>
                         </div>
