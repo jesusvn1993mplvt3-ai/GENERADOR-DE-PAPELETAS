@@ -3,7 +3,7 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>Generador Cirineo v5.1 (Pieza Grande)</title>
+    <title>Generador Cirineo v5.2 (Pieza Corta + Maq Black)</title>
     
     <link rel="icon" href="https://raw.githubusercontent.com/jesusvn1993mplvt3-ai/CIRINEO/refs/heads/main/icon.ico">
     
@@ -209,24 +209,22 @@
             // --- CÁLCULOS MATEMÁTICOS (SIN DECIMALES) ---
             const tiempo = parseFloat(subPiece?.tiempo);
             const hours = parseFloat(shiftHours) || 12;
-            
-            // Usamos Math.round para eliminar decimales
             const pzas1hr = tiempo > 0 ? Math.round(60 / tiempo) : '-'; 
             const pzasShift = tiempo > 0 ? Math.round((hours * 60) / tiempo) : '-'; 
 
+            // --- LIMPIEZA DE NOMBRE DE PIEZA (SOLO PRIMER PALABRA) ---
+            const rawPieza = order.piezaNombre || 'ESTANDAR';
+            // Divide por espacio y toma el primer elemento. Ej: "M024 (frente)" -> "M024"
+            const piezaVisual = rawPieza.split(' ')[0]; 
+
             // --- LÓGICA DE TAMAÑO DE FUENTE PARA "PIEZA" ---
-            const piezaNombre = order.piezaNombre || 'ESTANDAR';
             let piezaFontSize = '28px';
-            
-            // Ajuste dinámico de tamaño de fuente según longitud del texto
-            if (piezaNombre.length <= 6) {
-                piezaFontSize = '55px'; // Gigante para palabras cortas (ej. FRENTE)
-            } else if (piezaNombre.length <= 10) {
-                piezaFontSize = '42px';
-            } else if (piezaNombre.length <= 15) {
-                piezaFontSize = '32px';
+            if (piezaVisual.length <= 6) {
+                piezaFontSize = '60px'; // Aún más grande pues el texto es corto
+            } else if (piezaVisual.length <= 10) {
+                piezaFontSize = '48px';
             } else {
-                piezaFontSize = '22px'; // Pequeño para textos muy largos
+                piezaFontSize = '34px';
             }
 
             // Gestión de Imagen Inteligente
@@ -282,9 +280,6 @@
                         ) : (
                             <div className="flex flex-col items-center justify-center h-full">
                                 <div className="text-slate-300 text-xs text-center font-bold">SIN<br/>IMAGEN</div>
-                                <div className="text-[8px] text-slate-200 text-center mt-1">
-                                    {imageSources?.length > 0 ? 'No encontrada' : 'Sin fuentes'}
-                                </div>
                             </div>
                         )}
                     </div>
@@ -315,7 +310,7 @@
                             </div>
                         </div>
 
-                        {/* Fila 3: PIEZA DESTACADA (FONDO NEGRO, LETRA GRANDE) */}
+                        {/* Fila 3: PIEZA LIMPIA (SOLO PRIMER PALABRA) */}
                         <div className="lbl-row" style={{height: '24%', backgroundColor: '#000', color: '#FFF'}}>
                             <div className="lbl-col" style={{
                                 width: '100%', 
@@ -336,11 +331,11 @@
                                     overflow: 'hidden',
                                     textOverflow: 'ellipsis',
                                     marginTop: '2px'
-                                }}>{piezaNombre}</span>
+                                }}>{piezaVisual}</span>
                             </div>
                         </div>
 
-                        {/* Fila 4: Paquete */}
+                        {/* Fila 4: Paquete / Cantidad / MAQUINA BLACK */}
                         <div className="lbl-row" style={{height: '24%'}}>
                             <div className="lbl-col" style={{width: '33%', textAlign: 'center'}}>
                                 <div className="lbl-title">PAQUETE</div>
@@ -350,13 +345,14 @@
                                 <div className="lbl-title">CANTIDAD</div>
                                 <div className="lbl-big" style={{fontSize: '36px'}}>{order.piecesInPackage}</div>
                             </div>
-                            <div className="lbl-col" style={{width: '33%', textAlign: 'center'}}>
-                                <div className="lbl-title">MAQUINA</div>
-                                <div className="lbl-medium">{order.maquina || '0'}</div>
+                            {/* CELDA DE MÁQUINA MODIFICADA */}
+                            <div className="lbl-col" style={{width: '33%', textAlign: 'center', backgroundColor: '#000', color: '#fff'}}>
+                                <div className="lbl-title" style={{color: '#ccc'}}>MAQUINA</div>
+                                <div className="lbl-big" style={{fontSize: '48px', color: '#fff'}}>{order.maquina || '0'}</div>
                             </div>
                         </div>
 
-                        {/* Fila 5: Info técnica (REDUCIDA DE ALTURA) */}
+                        {/* Fila 5: Info técnica */}
                         <div className="lbl-row" style={{height: '11%'}}>
                             <div className="lbl-col" style={{width: '25%'}}>
                                 <div className="lbl-title" style={{fontSize:'9px'}}>TALLA</div>
