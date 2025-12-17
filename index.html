@@ -3,7 +3,7 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>Generador Cirineo v5.0 (Multi-Fuente + Firebase)</title>
+    <title>Generador Cirineo v5.1 (Pieza Grande)</title>
     
     <link rel="icon" href="https://raw.githubusercontent.com/jesusvn1993mplvt3-ai/CIRINEO/refs/heads/main/icon.ico">
     
@@ -120,7 +120,6 @@
             const [newUrl, setNewUrl] = useState('');
             const [loading, setLoading] = useState(false);
 
-            // Cargar configuración desde Firebase al abrir
             useEffect(() => {
                 if(isVisible) {
                     const unsubscribe = db.collection('app_config').doc('imagenes')
@@ -137,22 +136,16 @@
 
             const handleAdd = async () => {
                 if(!newName || !newUrl) return alert("Llena ambos campos");
-                
-                // Limpiar URL (quitar slash final)
                 let cleanUrl = newUrl.trim();
                 if(cleanUrl.endsWith('/')) cleanUrl = cleanUrl.slice(0, -1);
-
                 const newEntry = { id: Date.now(), name: newName, url: cleanUrl };
                 const updatedSources = [...sources, newEntry];
-
                 setLoading(true);
                 try {
                     await db.collection('app_config').doc('imagenes').set({ sources: updatedSources }, { merge: true });
                     setNewName('');
                     setNewUrl('');
-                } catch(e) {
-                    alert("Error al guardar: " + e.message);
-                }
+                } catch(e) { alert("Error al guardar: " + e.message); }
                 setLoading(false);
             };
 
@@ -173,37 +166,19 @@
                             <span className="flex items-center gap-2"><Icon name="images"/> FUENTES DE IMÁGENES</span>
                             <button onClick={onClose}><Icon name="x"/></button>
                         </div>
-                        
                         <div className="p-4 bg-blue-50 border-b border-blue-100 text-xs text-blue-800">
-                            <p>Agrega repositorios de GitHub, servidores locales (http://192.168...) o carpetas públicas.</p>
-                            <p className="mt-1 font-bold">El sistema buscará la imagen en orden descendente hasta encontrar una.</p>
+                            <p>Agrega repositorios de GitHub, servidores locales o carpetas públicas.</p>
                         </div>
-
                         <div className="p-4 flex flex-col gap-2 border-b">
                             <div className="flex gap-2">
-                                <input 
-                                    className="border p-2 rounded text-sm w-1/3" 
-                                    placeholder="Nombre (ej. GitHub)" 
-                                    value={newName} onChange={e => setNewName(e.target.value)}
-                                />
-                                <input 
-                                    className="border p-2 rounded text-sm w-2/3" 
-                                    placeholder="URL Base (ej. https://.../img)" 
-                                    value={newUrl} onChange={e => setNewUrl(e.target.value)}
-                                />
+                                <input className="border p-2 rounded text-sm w-1/3" placeholder="Nombre" value={newName} onChange={e => setNewName(e.target.value)} />
+                                <input className="border p-2 rounded text-sm w-2/3" placeholder="URL Base" value={newUrl} onChange={e => setNewUrl(e.target.value)} />
                             </div>
-                            <button 
-                                onClick={handleAdd} 
-                                disabled={loading}
-                                className="bg-green-600 hover:bg-green-700 text-white font-bold py-2 rounded text-sm flex justify-center items-center gap-2"
-                            >
+                            <button onClick={handleAdd} disabled={loading} className="bg-green-600 hover:bg-green-700 text-white font-bold py-2 rounded text-sm flex justify-center items-center gap-2">
                                 {loading ? 'GUARDANDO...' : <><Icon name="plus" size={16}/> AGREGAR FUENTE</>}
                             </button>
                         </div>
-
                         <div className="flex-grow overflow-y-auto p-4 space-y-2 bg-slate-50">
-                            {sources.length === 0 && <p className="text-center text-gray-400 text-sm">No hay fuentes configuradas.</p>}
-                            
                             {sources.map((source, index) => (
                                 <div key={source.id} className="bg-white border rounded p-3 flex justify-between items-center shadow-sm">
                                     <div className="overflow-hidden">
@@ -213,9 +188,7 @@
                                         </div>
                                         <div className="text-xs text-slate-500 truncate mt-1" title={source.url}>{source.url}</div>
                                     </div>
-                                    <button onClick={() => handleDelete(source.id)} className="text-red-500 hover:text-red-700 p-2">
-                                        <Icon name="trash-2" size={18}/>
-                                    </button>
+                                    <button onClick={() => handleDelete(source.id)} className="text-red-500 hover:text-red-700 p-2"><Icon name="trash-2" size={18}/></button>
                                 </div>
                             ))}
                         </div>
@@ -224,7 +197,7 @@
             );
         };
 
-        // --- COMPONENTE DE ETIQUETA (ACTUALIZADO PARA MULTI-FUENTE) ---
+        // --- COMPONENTE DE ETIQUETA MODIFICADO ---
         const ProductionLabel = ({ labelData, shiftHours, imageSources }) => {
             const svgRef = useRef(null);
             const order = labelData; 
@@ -233,18 +206,34 @@
             const barcodeValue = order.packageCode; 
             const fechaEntrega = order.fechaEntrega || new Date(Date.now() + 7 * 24 * 60 * 60 * 1000).toLocaleDateString('es-MX');
 
-            // Cálculos
+            // --- CÁLCULOS MATEMÁTICOS (SIN DECIMALES) ---
             const tiempo = parseFloat(subPiece?.tiempo);
             const hours = parseFloat(shiftHours) || 12;
-            const pzas1hr = tiempo > 0 ? (60 / tiempo).toFixed(1) : '-'; 
-            const pzasShift = tiempo > 0 ? ((hours * 60) / tiempo).toFixed(1) : '-'; 
+            
+            // Usamos Math.round para eliminar decimales
+            const pzas1hr = tiempo > 0 ? Math.round(60 / tiempo) : '-'; 
+            const pzasShift = tiempo > 0 ? Math.round((hours * 60) / tiempo) : '-'; 
 
-            // Gestión de Imagen Inteligente (Cascada)
+            // --- LÓGICA DE TAMAÑO DE FUENTE PARA "PIEZA" ---
+            const piezaNombre = order.piezaNombre || 'ESTANDAR';
+            let piezaFontSize = '28px';
+            
+            // Ajuste dinámico de tamaño de fuente según longitud del texto
+            if (piezaNombre.length <= 6) {
+                piezaFontSize = '55px'; // Gigante para palabras cortas (ej. FRENTE)
+            } else if (piezaNombre.length <= 10) {
+                piezaFontSize = '42px';
+            } else if (piezaNombre.length <= 15) {
+                piezaFontSize = '32px';
+            } else {
+                piezaFontSize = '22px'; // Pequeño para textos muy largos
+            }
+
+            // Gestión de Imagen Inteligente
             const [imgSrc, setImgSrc] = useState(null);
             const [currentSourceIdx, setCurrentSourceIdx] = useState(0);
-            const [tryPng, setTryPng] = useState(false); // Primero intenta JPG, si falla intenta PNG en la misma fuente
+            const [tryPng, setTryPng] = useState(false); 
 
-            // Resetear cuando cambia el código del modelo
             useEffect(() => {
                 if(imageSources && imageSources.length > 0 && order.codigo) {
                     setCurrentSourceIdx(0);
@@ -256,7 +245,6 @@
             }, [order.codigo, imageSources]);
 
             const handleImgError = () => {
-                // Paso 1: Si falló JPG, intentar PNG en la misma fuente
                 if (!tryPng) {
                     setTryPng(true);
                     if(imageSources[currentSourceIdx]) {
@@ -264,15 +252,12 @@
                     }
                     return;
                 }
-
-                // Paso 2: Si falló PNG, pasar a la siguiente fuente
                 const nextIdx = currentSourceIdx + 1;
                 if (nextIdx < imageSources.length) {
                     setCurrentSourceIdx(nextIdx);
-                    setTryPng(false); // Reiniciar a buscar JPG en la nueva fuente
+                    setTryPng(false); 
                     setImgSrc(`${imageSources[nextIdx].url}/${order.codigo}.jpg`);
                 } else {
-                    // Se acabaron las fuentes
                     setImgSrc(null); 
                 }
             };
@@ -293,11 +278,7 @@
                     {/* ZONA 1: IMAGEN (IZQUIERDA) */}
                     <div className="col-img">
                         {imgSrc ? (
-                            <img 
-                                src={imgSrc} 
-                                onError={handleImgError} 
-                                alt={order.codigo}
-                            />
+                            <img src={imgSrc} onError={handleImgError} alt={order.codigo}/>
                         ) : (
                             <div className="flex flex-col items-center justify-center h-full">
                                 <div className="text-slate-300 text-xs text-center font-bold">SIN<br/>IMAGEN</div>
@@ -310,7 +291,8 @@
 
                     {/* ZONA 2: DATOS (CENTRO) */}
                     <div className="col-data">
-                        <div className="lbl-row" style={{height: '18%'}}>
+                        {/* Fila 1 */}
+                        <div className="lbl-row" style={{height: '17%'}}>
                             <div className="lbl-col" style={{width: '65%'}}>
                                 <div className="lbl-title">MODELO</div>
                                 <div className="lbl-big">{order.codigo || 'S/N'}</div>
@@ -321,7 +303,8 @@
                             </div>
                         </div>
                         
-                        <div className="lbl-row" style={{height: '14%'}}>
+                        {/* Fila 2 */}
+                        <div className="lbl-row" style={{height: '13%'}}>
                             <div className="lbl-col" style={{width: '70%'}}>
                                 <div className="lbl-title">CLIENTE</div>
                                 <div className="lbl-std truncate">{order.cliente || '---'}</div>
@@ -332,13 +315,32 @@
                             </div>
                         </div>
 
-                        <div className="lbl-row" style={{height: '12%', alignItems: 'center', backgroundColor: '#f8fafc'}}>
-                            <div className="lbl-col" style={{width: '100%', flexDirection: 'row', gap: '5px', border: 'none'}}>
-                                <span className="lbl-title">PIEZA:</span>
-                                <span className="lbl-std" style={{fontSize: '16px'}}>{order.piezaNombre || 'ESTANDAR'}</span>
+                        {/* Fila 3: PIEZA DESTACADA (FONDO NEGRO, LETRA GRANDE) */}
+                        <div className="lbl-row" style={{height: '24%', backgroundColor: '#000', color: '#FFF'}}>
+                            <div className="lbl-col" style={{
+                                width: '100%', 
+                                border: 'none', 
+                                alignItems: 'center', 
+                                justifyContent: 'center',
+                                padding: '0 5px'
+                            }}>
+                                <span style={{fontSize: '9px', textTransform: 'uppercase', color: '#aaa', fontWeight: 'bold', lineHeight: '1'}}>PIEZA</span>
+                                <span style={{
+                                    fontFamily: "'Oswald', sans-serif",
+                                    fontWeight: '700',
+                                    fontSize: piezaFontSize, 
+                                    lineHeight: '0.9',
+                                    textAlign: 'center',
+                                    width: '100%',
+                                    whiteSpace: 'nowrap',
+                                    overflow: 'hidden',
+                                    textOverflow: 'ellipsis',
+                                    marginTop: '2px'
+                                }}>{piezaNombre}</span>
                             </div>
                         </div>
 
+                        {/* Fila 4: Paquete */}
                         <div className="lbl-row" style={{height: '24%'}}>
                             <div className="lbl-col" style={{width: '33%', textAlign: 'center'}}>
                                 <div className="lbl-title">PAQUETE</div>
@@ -354,25 +356,28 @@
                             </div>
                         </div>
 
-                        <div className="lbl-row" style={{flexGrow: 1}}>
+                        {/* Fila 5: Info técnica (REDUCIDA DE ALTURA) */}
+                        <div className="lbl-row" style={{height: '11%'}}>
                             <div className="lbl-col" style={{width: '25%'}}>
-                                <div className="lbl-title">TALLA</div>
-                                <div className="lbl-medium">{subPiece?.talla || 'U'}</div>
+                                <div className="lbl-title" style={{fontSize:'9px'}}>TALLA</div>
+                                <div className="lbl-medium" style={{fontSize:'16px'}}>{subPiece?.talla || 'U'}</div>
                             </div>
                             <div className="lbl-col" style={{width: '25%'}}>
-                                <div className="lbl-title">PESO(g)</div>
-                                <div className="lbl-std">{subPiece?.peso || '-'}</div>
+                                <div className="lbl-title" style={{fontSize:'9px'}}>PESO(g)</div>
+                                <div className="lbl-std" style={{fontSize:'14px'}}>{subPiece?.peso || '-'}</div>
                             </div>
                             <div className="lbl-col" style={{width: '25%'}}>
-                                <div className="lbl-title">PZS/HR</div>
-                                <div className="lbl-std" style={{fontSize: '18px'}}>{pzas1hr}</div>
+                                <div className="lbl-title" style={{fontSize:'9px'}}>PZS/HR</div>
+                                <div className="lbl-std" style={{fontSize:'16px'}}>{pzas1hr}</div>
                             </div>
                              <div className="lbl-col" style={{width: '25%'}}>
-                                <div className="lbl-title">{hours} HRS</div>
-                                <div className="lbl-std" style={{fontSize: '18px'}}>{pzasShift}</div>
+                                <div className="lbl-title" style={{fontSize:'9px'}}>{hours} HRS</div>
+                                <div className="lbl-std" style={{fontSize:'16px'}}>{pzasShift}</div>
                             </div>
                         </div>
-                        <div className="lbl-row" style={{height: '15px', borderBottom: 'none'}}>
+
+                        {/* Footer */}
+                        <div className="lbl-row" style={{flexGrow: 1, borderBottom: 'none', alignItems: 'center'}}>
                             <div style={{fontSize: '9px', width: '100%', textAlign: 'center', fontWeight: 'bold'}}>
                                 ENTREGA: {fechaEntrega}
                             </div>
@@ -543,12 +548,9 @@
             const [isGeneratingPdf, setIsGeneratingPdf] = useState(false); 
             const [shiftHours, setShiftHours] = useState(12);
             
-            // Estado para las fuentes de imágenes cargadas de Firebase
             const [imageSources, setImageSources] = useState([]);
-
             const pdfContainerRef = useRef(null);
 
-            // Cargar fuentes de imágenes
             useEffect(() => {
                 const unsubscribe = db.collection('app_config').doc('imagenes')
                     .onSnapshot(doc => {
