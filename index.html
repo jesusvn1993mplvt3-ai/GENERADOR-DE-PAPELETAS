@@ -3,7 +3,7 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>Generador Cirineo v5.3 (Texto Centrado Puro)</title>
+    <title>Generador Cirineo v5.4 (Zebra Optimized)</title>
     
     <link rel="icon" href="https://raw.githubusercontent.com/jesusvn1993mplvt3-ai/CIRINEO/refs/heads/main/icon.ico">
     
@@ -63,7 +63,7 @@
         }
 
         .col-img { width: 25%; display: flex; align-items: center; justify-content: center; border-right: 2px solid #000; padding-right: 5px; overflow: hidden; }
-        .col-img img { width: 100%; height: 100%; object-fit: contain; }
+        .col-img img { width: 100%; height: 100%; object-fit: contain; image-rendering: pixelated; } /* Pixelated ayuda a la nitidez en Zebra */
 
         .col-data { width: 60%; display: flex; flex-direction: column; border-right: 2px solid #000; }
 
@@ -90,7 +90,7 @@
         const { useState, useEffect, useRef, useMemo } = React;
 
         const firebaseConfig = {
-            apiKey: "AIzaSyBqHgV4vDat1-VmZfKbiPg7nuiX-ROcexw",
+            apiKey: "AIzaSyCngQL1pdqghv2vbjkPycT1Xf0C46f7jYs",
             authDomain: "cirineo-cec21.firebaseapp.com",
             projectId: "cirineo-cec21",
             storageBucket: "cirineo-cec21.firebasestorage.app",
@@ -113,7 +113,74 @@
             return <div ref={containerRef} className="inline-block" style={{ width: size, height: size }}></div>;
         };
 
-        // --- NUEVO MODAL DE GESTIÓN DE FUENTES DE IMÁGENES (DB) ---
+        // --- ALGORITMO DE PUNTILLISMO (FLOYD-STEINBERG DITHERING) ---
+        // Convierte la imagen a blanco y negro puro usando difusión de error
+        const processImageForThermal = (imgUrl) => {
+            return new Promise((resolve, reject) => {
+                const img = new Image();
+                img.crossOrigin = "Anonymous"; // Importante para imágenes externas
+                img.src = imgUrl;
+                img.onload = () => {
+                    const canvas = document.createElement('canvas');
+                    const ctx = canvas.getContext('2d');
+                    
+                    // Redimensionar para que el proceso no sea lento, pero mantenga calidad
+                    const maxWidth = 300; 
+                    const scale = maxWidth / img.width;
+                    canvas.width = maxWidth;
+                    canvas.height = img.height * scale;
+
+                    ctx.drawImage(img, 0, 0, canvas.width, canvas.height);
+                    
+                    const imageData = ctx.getImageData(0, 0, canvas.width, canvas.height);
+                    const data = imageData.data;
+                    const width = canvas.width;
+                    
+                    // Convertir a escala de grises primero
+                    for (let i = 0; i < data.length; i += 4) {
+                        const avg = (data[i] * 0.299 + data[i + 1] * 0.587 + data[i + 2] * 0.114);
+                        data[i] = avg; // R
+                        data[i + 1] = avg; // G
+                        data[i + 2] = avg; // B
+                    }
+
+                    // Aplicar Floyd-Steinberg Dithering
+                    for (let y = 0; y < canvas.height; y++) {
+                        for (let x = 0; x < canvas.width; x++) {
+                            const i = (y * width + x) * 4;
+                            const oldPixel = data[i];
+                            const newPixel = oldPixel < 128 ? 0 : 255; // Blanco o Negro puro
+                            const quantError = oldPixel - newPixel;
+
+                            data[i] = data[i + 1] = data[i + 2] = newPixel;
+
+                            // Difundir el error a los vecinos
+                            if (x + 1 < width) {
+                                const idx = (y * width + (x + 1)) * 4;
+                                data[idx] += quantError * 7 / 16;
+                            }
+                            if (x - 1 >= 0 && y + 1 < canvas.height) {
+                                const idx = ((y + 1) * width + (x - 1)) * 4;
+                                data[idx] += quantError * 3 / 16;
+                            }
+                            if (y + 1 < canvas.height) {
+                                const idx = ((y + 1) * width + x) * 4;
+                                data[idx] += quantError * 5 / 16;
+                            }
+                            if (x + 1 < width && y + 1 < canvas.height) {
+                                const idx = ((y + 1) * width + (x + 1)) * 4;
+                                data[idx] += quantError * 1 / 16;
+                            }
+                        }
+                    }
+
+                    ctx.putImageData(imageData, 0, 0);
+                    resolve(canvas.toDataURL('image/png'));
+                };
+                img.onerror = (e) => reject(e);
+            });
+        };
+
         const ImageConfigModal = ({ isVisible, onClose }) => {
             const [sources, setSources] = useState([]);
             const [newName, setNewName] = useState('');
@@ -206,61 +273,54 @@
             const barcodeValue = order.packageCode; 
             const fechaEntrega = order.fechaEntrega || new Date(Date.now() + 7 * 24 * 60 * 60 * 1000).toLocaleDateString('es-MX');
 
-            // --- CÁLCULOS MATEMÁTICOS (SIN DECIMALES) ---
             const tiempo = parseFloat(subPiece?.tiempo);
             const hours = parseFloat(shiftHours) || 12;
             const pzas1hr = tiempo > 0 ? Math.round(60 / tiempo) : '-'; 
             const pzasShift = tiempo > 0 ? Math.round((hours * 60) / tiempo) : '-'; 
 
-            // --- LIMPIEZA DE NOMBRE DE PIEZA (SOLO PRIMER PALABRA) ---
             const rawPieza = order.piezaNombre || 'ESTANDAR';
-            // Divide por espacio y toma el primer elemento. Ej: "M024 (frente)" -> "M024"
             const piezaVisual = rawPieza.split(' ')[0]; 
 
-            // --- LÓGICA DE TAMAÑO DE FUENTE PARA "PIEZA" ---
             let piezaFontSize = '28px';
-            if (piezaVisual.length <= 6) {
-                piezaFontSize = '64px'; // Gigante para palabras cortas
-            } else if (piezaVisual.length <= 10) {
-                piezaFontSize = '52px';
-            } else {
-                piezaFontSize = '38px';
-            }
+            if (piezaVisual.length <= 6) { piezaFontSize = '64px'; } 
+            else if (piezaVisual.length <= 10) { piezaFontSize = '52px'; } 
+            else { piezaFontSize = '38px'; }
 
-            // Gestión de Imagen Inteligente
-            const [imgSrc, setImgSrc] = useState(null);
+            // Gestión de Imagen con Procesamiento para Zebra
+            const [processedImg, setProcessedImg] = useState(null);
             const [currentSourceIdx, setCurrentSourceIdx] = useState(0);
-            const [tryPng, setTryPng] = useState(false); 
 
             useEffect(() => {
                 if(imageSources && imageSources.length > 0 && order.codigo) {
-                    setCurrentSourceIdx(0);
-                    setTryPng(false);
-                    setImgSrc(`${imageSources[0].url}/${order.codigo}.jpg`);
+                    const tryLoadAndProcess = async (index) => {
+                        if (index >= imageSources.length) {
+                            setProcessedImg(null);
+                            return;
+                        }
+                        
+                        // Intentar JPG primero
+                        const urlJpg = `${imageSources[index].url}/${order.codigo}.jpg`;
+                        try {
+                            const ditheredData = await processImageForThermal(urlJpg);
+                            setProcessedImg(ditheredData);
+                        } catch (e) {
+                            // Si falla JPG, intentar PNG
+                            const urlPng = `${imageSources[index].url}/${order.codigo}.png`;
+                            try {
+                                const ditheredDataPng = await processImageForThermal(urlPng);
+                                setProcessedImg(ditheredDataPng);
+                            } catch (e2) {
+                                // Si fallan ambos, probar siguiente fuente
+                                tryLoadAndProcess(index + 1);
+                            }
+                        }
+                    };
+                    tryLoadAndProcess(0);
                 } else {
-                    setImgSrc(null);
+                    setProcessedImg(null);
                 }
             }, [order.codigo, imageSources]);
 
-            const handleImgError = () => {
-                if (!tryPng) {
-                    setTryPng(true);
-                    if(imageSources[currentSourceIdx]) {
-                        setImgSrc(`${imageSources[currentSourceIdx].url}/${order.codigo}.png`);
-                    }
-                    return;
-                }
-                const nextIdx = currentSourceIdx + 1;
-                if (nextIdx < imageSources.length) {
-                    setCurrentSourceIdx(nextIdx);
-                    setTryPng(false); 
-                    setImgSrc(`${imageSources[nextIdx].url}/${order.codigo}.jpg`);
-                } else {
-                    setImgSrc(null); 
-                }
-            };
-
-            // Barcode
             useEffect(() => {
                 if (svgRef.current && barcodeValue) {
                     try {
@@ -273,10 +333,10 @@
 
             return (
                 <div className="label-layout">
-                    {/* ZONA 1: IMAGEN (IZQUIERDA) */}
+                    {/* ZONA 1: IMAGEN (IZQUIERDA) - AHORA CON PUNTILLISMO */}
                     <div className="col-img">
-                        {imgSrc ? (
-                            <img src={imgSrc} onError={handleImgError} alt={order.codigo}/>
+                        {processedImg ? (
+                            <img src={processedImg} alt={order.codigo} />
                         ) : (
                             <div className="flex flex-col items-center justify-center h-full">
                                 <div className="text-slate-300 text-xs text-center font-bold">SIN<br/>IMAGEN</div>
@@ -298,43 +358,29 @@
                             </div>
                         </div>
                         
-                        {/* Fila 2 */}
+                        {/* Fila 2 - MODIFICADO: CLIENTE + PARTIDA (Partida más grande) */}
                         <div className="lbl-row" style={{height: '13%'}}>
-                            <div className="lbl-col" style={{width: '70%'}}>
+                            <div className="lbl-col" style={{width: '55%'}}>
                                 <div className="lbl-title">CLIENTE</div>
                                 <div className="lbl-std truncate">{order.cliente || '---'}</div>
                             </div>
-                            <div className="lbl-col" style={{width: '30%'}}>
+                            <div className="lbl-col" style={{width: '45%'}}>
                                 <div className="lbl-title">PARTIDA</div>
-                                <div className="lbl-std">{order.partida || '-'}</div>
+                                {/* AUMENTADO TAMAÑO DE PARTIDA */}
+                                <div className="lbl-medium" style={{fontSize: '22px'}}>{order.partida || '-'}</div>
                             </div>
                         </div>
 
-                        {/* Fila 3: PIEZA LIMPIA Y CENTRADA (SIN TEXTO "PIEZA") */}
+                        {/* Fila 3: PIEZA */}
                         <div className="lbl-row" style={{height: '24%', backgroundColor: '#000', color: '#FFF'}}>
-                            <div className="lbl-col" style={{
-                                width: '100%', 
-                                border: 'none', 
-                                alignItems: 'center', 
-                                justifyContent: 'center',
-                                padding: '0',
-                                display: 'flex' 
-                            }}>
-                                <span style={{
-                                    fontFamily: "'Oswald', sans-serif",
-                                    fontWeight: '700',
-                                    fontSize: piezaFontSize, 
-                                    lineHeight: '1',
-                                    textAlign: 'center',
-                                    width: '100%',
-                                    whiteSpace: 'nowrap',
-                                    overflow: 'hidden',
-                                    textOverflow: 'ellipsis'
-                                }}>{piezaVisual}</span>
+                            <div className="lbl-col" style={{width: '100%', border: 'none', alignItems: 'center', justifyContent: 'center', padding: '0', display: 'flex'}}>
+                                <span style={{fontFamily: "'Oswald', sans-serif", fontWeight: '700', fontSize: piezaFontSize, lineHeight: '1', textAlign: 'center', width: '100%', whiteSpace: 'nowrap', overflow: 'hidden', textOverflow: 'ellipsis'}}>
+                                    {piezaVisual}
+                                </span>
                             </div>
                         </div>
 
-                        {/* Fila 4: Paquete / Cantidad / MAQUINA BLACK */}
+                        {/* Fila 4: Paquete / Cantidad / MAQUINA (MODIFICADO ESTILO MAQUINA) */}
                         <div className="lbl-row" style={{height: '24%'}}>
                             <div className="lbl-col" style={{width: '33%', textAlign: 'center'}}>
                                 <div className="lbl-title">PAQUETE</div>
@@ -344,10 +390,12 @@
                                 <div className="lbl-title">CANTIDAD</div>
                                 <div className="lbl-big" style={{fontSize: '36px'}}>{order.piecesInPackage}</div>
                             </div>
-                            {/* CELDA DE MÁQUINA MODIFICADA */}
-                            <div className="lbl-col" style={{width: '33%', textAlign: 'center', backgroundColor: '#000', color: '#fff'}}>
-                                <div className="lbl-title" style={{color: '#ccc'}}>MAQUINA</div>
-                                <div className="lbl-big" style={{fontSize: '48px', color: '#fff'}}>{order.maquina || '0'}</div>
+                            {/* ESTILO MAQUINA NUEVO: Título Blanco/Negro, Valor Negro/Blanco */}
+                            <div className="lbl-col" style={{width: '33%', padding: 0, display: 'flex', flexDirection: 'column', border: 'none'}}>
+                                <div style={{backgroundColor: 'white', color: 'black', textAlign: 'center', fontSize: '10px', fontWeight: 'bold', padding: '2px', borderBottom:'1px solid black'}}>MAQUINA</div>
+                                <div style={{backgroundColor: 'black', color: 'white', flexGrow: 1, display: 'flex', alignItems: 'center', justifyContent: 'center', fontSize: '48px', fontFamily: "'Oswald', sans-serif", fontWeight: 'bold'}}>
+                                    {order.maquina || '0'}
+                                </div>
                             </div>
                         </div>
 
@@ -381,15 +429,7 @@
 
                     {/* ZONA 3: BARCODE */}
                     <div className="col-barcode">
-                        <div style={{
-                            transform: 'rotate(90deg)', 
-                            transformOrigin: 'center', 
-                            width: '3.5in', 
-                            display: 'flex',
-                            flexDirection: 'column',
-                            alignItems: 'center',
-                            justifyContent: 'center'
-                        }}>
+                        <div style={{transform: 'rotate(90deg)', transformOrigin: 'center', width: '3.5in', display: 'flex', flexDirection: 'column', alignItems: 'center', justifyContent: 'center'}}>
                              <svg ref={svgRef} style={{width: '100%', height: 'auto'}}></svg>
                              <div style={{fontSize: '10px', fontFamily: 'monospace', marginTop: '5px'}}>{barcodeValue}</div>
                         </div>
@@ -621,7 +661,7 @@
                     {/* SIDEBAR */}
                     <div className="w-full lg:w-72 bg-slate-800 text-white flex flex-col border-r border-slate-700 shadow-xl shrink-0 h-64 lg:h-auto">
                         <div className="p-4 bg-slate-900 border-b border-slate-700">
-                            <h1 className="text-xl font-bold text-yellow-400 tracking-tighter">CIRINEO v5.0</h1>
+                            <h1 className="text-xl font-bold text-yellow-400 tracking-tighter">CIRINEO v5.4</h1>
                             <input type="text" placeholder="Buscar orden..." value={filterText} onChange={e => setFilterText(e.target.value)} className="w-full mt-2 bg-slate-800 border border-slate-600 rounded p-2 text-sm" />
                             
                             <div className="mt-4 grid grid-cols-2 gap-2">
