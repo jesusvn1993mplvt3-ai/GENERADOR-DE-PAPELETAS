@@ -28,7 +28,6 @@
         
         #reader a, #reader-hidden a { display: none !important; }
 
-        /* --- CLASES CRÍTICAS PARA EL PDF --- */
         .pdf-fixed-container {
             width: 6in;
             height: 4in;
@@ -51,7 +50,6 @@
             background: white;
         }
 
-        /* --- ESTRUCTURA DE LA ETIQUETA --- */
         .label-layout {
             width: 100%;
             height: 100%;
@@ -196,7 +194,6 @@
             );
         };
 
-        // --- COMPONENTE DE ETIQUETA ---
         const ProductionLabel = ({ labelData, shiftHours, imageSources }) => {
             const svgRef = useRef(null);
             const order = labelData; 
@@ -204,9 +201,6 @@
             
             const barcodeValue = order.packageCode; 
             
-            // --- CORRECCIÓN DE FECHA ---
-            // Se prioriza 'order.fecha' (que viene del generador) sobre 'fechaEntrega'.
-            // Se asume formato YYYY-MM-DD y se convierte a DD/MM/YYYY
             const rawDate = order.fecha || order.fechaEntrega;
             const fechaVisual = rawDate ? rawDate.split('-').reverse().join('/') : new Date().toLocaleDateString('es-MX');
 
@@ -223,7 +217,6 @@
             else if (piezaVisual.length <= 10) { piezaFontSize = '52px'; } 
             else { piezaFontSize = '38px'; }
 
-            // Gestión de Imagen Simplificada (SIN PUNTILLISMO)
             const [imgSrc, setImgSrc] = useState(null);
             const [currentSourceIdx, setCurrentSourceIdx] = useState(0);
             const [tryPng, setTryPng] = useState(false);
@@ -268,7 +261,6 @@
 
             return (
                 <div className="label-layout">
-                    {/* ZONA 1: IMAGEN (ORIGINAL) */}
                     <div className="col-img">
                         {imgSrc ? (
                             <img src={imgSrc} onError={handleImgError} alt={order.codigo} />
@@ -279,9 +271,7 @@
                         )}
                     </div>
 
-                    {/* ZONA 2: DATOS (CENTRO) */}
                     <div className="col-data">
-                        {/* Fila 1 */}
                         <div className="lbl-row" style={{height: '17%'}}>
                             <div className="lbl-col" style={{width: '65%'}}>
                                 <div className="lbl-title">MODELO</div>
@@ -293,7 +283,6 @@
                             </div>
                         </div>
                         
-                        {/* Fila 2 - CLIENTE + PARTIDA */}
                         <div className="lbl-row" style={{height: '13%'}}>
                             <div className="lbl-col" style={{width: '55%'}}>
                                 <div className="lbl-title">CLIENTE</div>
@@ -305,8 +294,7 @@
                             </div>
                         </div>
 
-                        {/* Fila 3: PIEZA */}
-                        <div className="lbl-row" style={{height: '24%', backgroundColor: '#000', color: '#FFF'}}>
+                        <div className="lbl-row" style={{height: '22%', backgroundColor: '#000', color: '#FFF'}}>
                             <div className="lbl-col" style={{width: '100%', border: 'none', alignItems: 'center', justifyContent: 'center', padding: '0', display: 'flex'}}>
                                 <span style={{fontFamily: "'Oswald', sans-serif", fontWeight: '700', fontSize: piezaFontSize, lineHeight: '1', textAlign: 'center', width: '100%', whiteSpace: 'nowrap', overflow: 'hidden', textOverflow: 'ellipsis'}}>
                                     {piezaVisual}
@@ -314,31 +302,29 @@
                             </div>
                         </div>
 
-                        {/* Fila 4: Paquete / Cantidad / MAQUINA */}
-                        <div className="lbl-row" style={{height: '24%'}}>
+                        <div className="lbl-row" style={{height: '30%'}}>
                             <div className="lbl-col" style={{width: '33%', textAlign: 'center'}}>
                                 <div className="lbl-title">PAQUETE</div>
-                                <div className="lbl-big" style={{fontSize: '36px'}}>{order.displayPackageId}</div>
+                                <div className="lbl-big" style={{fontSize: '48px'}}>{order.displayPackageId}</div>
                             </div>
-                            <div className="lbl-col" style={{width: '34%', backgroundColor: '#eee', textAlign: 'center'}}>
+                            {/* CANTIDAD: FONDO BLANCO Y TAMAÑO IGUALADO A MÁQUINA */}
+                            <div className="lbl-col" style={{width: '34%', backgroundColor: 'white', textAlign: 'center'}}>
                                 <div className="lbl-title">CANTIDAD</div>
-                                <div className="lbl-big" style={{fontSize: '36px'}}>{order.piecesInPackage}</div>
+                                <div className="lbl-big" style={{fontSize: '48px'}}>{order.piecesInPackage}</div>
                             </div>
-                            {/* ESTILO MAQUINA */}
+                            {/* MÁQUINA: ETIQUETA AUMENTADA Y NÚMERO AJUSTADO */}
                             <div className="lbl-col" style={{width: '33%', padding: 0, display: 'flex', flexDirection: 'column', border: 'none'}}>
-                                <div style={{backgroundColor: 'white', color: 'black', textAlign: 'center', fontSize: '10px', fontWeight: 'bold', padding: '2px', borderBottom:'1px solid black'}}>MAQUINA</div>
-                                <div style={{backgroundColor: 'black', color: 'white', flexGrow: 1, display: 'flex', alignItems: 'center', justifyContent: 'center', fontSize: '48px', fontFamily: "'Oswald', sans-serif", fontWeight: 'bold'}}>
+                                <div style={{backgroundColor: 'white', color: 'black', textAlign: 'center', fontSize: '13px', fontStyle: 'italic', fontWeight: 'bold', padding: '1px', borderBottom:'1px solid black'}}>MÁQUINA</div>
+                                <div style={{backgroundColor: 'black', color: 'white', flexGrow: 1, display: 'flex', alignItems: 'center', justifyContent: 'center', fontSize: '42px', fontFamily: "'Oswald', sans-serif", fontWeight: 'bold'}}>
                                     {order.maquina || '0'}
                                 </div>
                             </div>
                         </div>
 
-                        {/* Fila 5: Info técnica */}
                         <div className="lbl-row" style={{height: '11%'}}>
-                            <div className="lbl-col" style={{width: '25%'}}>
-                                <div className="lbl-title" style={{fontSize:'9px'}}>TALLA</div>
-                                {/* MODIFICADO: TALLA MÁS GRANDE */}
-                                <div className="lbl-medium" style={{fontSize:'34px', lineHeight: '0.9'}}>{subPiece?.talla || 'U'}</div>
+                            {/* TALLA: SIN PALABRA TALLA Y VALOR CENTRADO */}
+                            <div className="lbl-col" style={{width: '25%', alignItems: 'center', justifyContent: 'center'}}>
+                                <div className="lbl-medium" style={{fontSize:'42px', lineHeight: '1'}}>{subPiece?.talla || 'U'}</div>
                             </div>
                             <div className="lbl-col" style={{width: '25%'}}>
                                 <div className="lbl-title" style={{fontSize:'9px'}}>PESO(g)</div>
@@ -354,16 +340,13 @@
                             </div>
                         </div>
 
-                        {/* Footer */}
                         <div className="lbl-row" style={{flexGrow: 1, borderBottom: 'none', alignItems: 'center'}}>
                             <div style={{fontSize: '9px', width: '100%', textAlign: 'center', fontWeight: 'bold'}}>
-                                {/* CORREGIDO: MUESTRA FECHA SELECCIONADA EN GENERADOR */}
                                 ENTREGA: {fechaVisual}
                             </div>
                         </div>
                     </div>
 
-                    {/* ZONA 3: BARCODE */}
                     <div className="col-barcode">
                         <div style={{transform: 'rotate(90deg)', transformOrigin: 'center', width: '3.5in', display: 'flex', flexDirection: 'column', alignItems: 'center', justifyContent: 'center'}}>
                              <svg ref={svgRef} style={{width: '100%', height: 'auto'}}></svg>
@@ -594,7 +577,6 @@
 
             return (
                 <div className="flex flex-col lg:flex-row h-screen w-full">
-                    {/* SIDEBAR */}
                     <div className="w-full lg:w-72 bg-slate-800 text-white flex flex-col border-r border-slate-700 shadow-xl shrink-0 h-64 lg:h-auto">
                         <div className="p-4 bg-slate-900 border-b border-slate-700">
                             <h1 className="text-xl font-bold text-yellow-400 tracking-tighter">CIRINEO v5.5</h1>
@@ -623,9 +605,7 @@
                         </div>
                     </div>
 
-                    {/* MAIN CONTENT */}
                     <div className="flex-grow bg-slate-100 flex flex-col relative overflow-hidden">
-                        {/* Header */}
                         <div className="bg-white p-3 shadow-sm border-b flex justify-between items-center z-10">
                             <h2 className="font-bold text-slate-700 text-lg truncate">
                                 {selectedOrder ? `${selectedOrder.codigo} - ${packageLabels.length} PAQUETES` : 'Seleccione una orden'}
@@ -637,7 +617,6 @@
                             )}
                         </div>
 
-                        {/* Vista Previa */}
                         <div className="flex-grow overflow-y-auto p-4 lg:p-8 flex flex-col items-center">
                             {packageLabels.length > 0 ? (
                                 <>
@@ -659,7 +638,6 @@
                         </div>
                     </div>
 
-                    {/* CONTENEDOR OCULTO PARA PDF */}
                     <div style={{position: 'absolute', top: 0, left: '-9999px', width: '6in'}}>
                         <div ref={pdfContainerRef}>
                             {packageLabels.map((labelData, index) => (
@@ -670,7 +648,6 @@
                         </div>
                     </div>
 
-                    {/* MODALES */}
                     <div className="w-full lg:w-64 bg-white border-l border-slate-200 shadow-xl z-20 shrink-0 hidden lg:flex flex-col">
                          <div className="p-4 bg-slate-50 border-b">
                             <h3 className="font-bold text-slate-700 flex items-center gap-2"><Icon name="qr-code"/> Scanner</h3>
